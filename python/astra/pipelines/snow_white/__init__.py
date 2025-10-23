@@ -153,7 +153,7 @@ def snow_white(
                 if first_T > 120000:
                     first_T=120000
                 if first_g < 601:
-                    first_g=601_
+                    first_g=601
                 if first_T>=16000 and first_T<=40000:
                     line_crop = np.loadtxt(os.path.join(PIPELINE_DATA_DIR, 'line_crop.dat'),skiprows=0,max_rows=5) #exclude Halpha. It is needed in exception
                 elif first_T>=8000 and first_T<16000:
@@ -168,7 +168,7 @@ def snow_white(
                 # initiate parameters for the fit
                 fit_params = lmfit.Parameters()
                 fit_params['teff'] = lmfit.Parameter(name="teff",value=first_T,min=4000,max=120000)
-                fit_params['logg'] = lmfit.Parameter(name="logg",value=first_g,min=6    01,max=949)
+                fit_params['logg'] = lmfit.Parameter(name="logg",value=first_g,min=601,max=949)
                 fit_params['rv'] = lmfit.Parameter(name="rv",value=0.2, min=-80, max=80) #this is a wavelenght shift not a radial velocity. since a eparate module finds rv
 
                 #new normalization rotine working just on the balmer lines
@@ -192,7 +192,7 @@ def snow_white(
                 err_params = lmfit.Parameters()
                 err_params['teff'] = lmfit.Parameter(name="teff",value=best_T,min=4000,max=120000)
                 err_params['logg'] = lmfit.Parameter(name="logg",value=best_g,min=601,max=949)
-                err_params['rv']= lmfit.Parameter(name="rv",value=best_rv, min=-80, max=80)
+                err_params['rv']= lmfit.Parameter(name="rv",value=shift, min=-80, max=80)
                 err_best=lmfit.minimize(fitting_scripts.line_func_rv,err_params,args=(spec_nl,l_crop,emu,wref),method="leastsq")
                 best_Te=err_best.params['teff'].stderr
                 best_ge=err_best.params['logg'].stderr
@@ -247,7 +247,7 @@ def snow_white(
                     err_params2 = lmfit.Parameters()
                     err_params2['teff'] = lmfit.Parameter(name="teff",value=best_T2,min=4000,max=120000)
                     err_params2['logg'] = lmfit.Parameter(name="logg",value=best_g2,min=601,max=949)
-                    err_params2['rv']= lmfit.Parameter(name="rv",value=best_rv2, min=-80, max=80)
+                    err_params2['rv']= lmfit.Parameter(name="rv",value=shift2, min=-80, max=80)
                     err_best2=lmfit.minimize(fitting_scripts.line_func_rv,err_params2,args=(spec_nl,l_crop,emu,wref),method="leastsq")
                     best_Te2=err_best2.params['teff'].stderr
                     best_ge2=err_best2.params['logg'].stderr
