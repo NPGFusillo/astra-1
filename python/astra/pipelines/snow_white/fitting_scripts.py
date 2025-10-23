@@ -274,8 +274,8 @@ def line_func_rv_old(params,_sn, _l,emu,wref):
 
 def fit_grid(specn,l_crop):
     #load normalised models and linearly interp models onto spectrum wave
-    specn = specn[(specn[:,0]>3500)& (specn[:,0]<7500)]
-    m_wave=np.arange(3000,8000,0.5)
+    specn = specn[(specn[:,0]>3800)& (specn[:,0]<7500)]
+    m_wave=np.arange(3700,7999,1)
     m_flux_n=np.load(os.path.join(PIPELINE_DATA_DIR, "da_flux_cube.npy"))
     m_param=np.load(os.path.join(PIPELINE_DATA_DIR, "da_param_cube.npy"))
     sn_w = specn[:,0]
