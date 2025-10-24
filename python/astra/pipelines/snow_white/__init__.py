@@ -22,6 +22,7 @@ from astra.models.snow_white import SnowWhite
 PIPELINE_DATA_DIR = expand_path(f"$MWM_ASTRA/pipelines/snow_white")
 LARGE = 1e3
 def refit(fit_params,spec_nl,emu,wref):
+    first_T=fit_params['teff'].value
     if first_T>=16000 and first_T<=40000:
         line_crop = np.loadtxt(os.path.join(PIPELINE_DATA_DIR, 'line_crop.dat'),skiprows=1,max_rows=4) #exclude Halpha. It is needed in exception
     elif first_T>=8000 and first_T<16000:
