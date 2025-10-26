@@ -21,7 +21,7 @@ from astra.models.snow_white import SnowWhite
 
 PIPELINE_DATA_DIR = expand_path(f"$MWM_ASTRA/pipelines/snow_white")
 LARGE = 1e3
-def refit(fit_params,spec_nl,emu,wref):
+def refit(fit_params,spec_nl,spec_w,emu,wref):
     first_T=fit_params['teff'].value
     if first_T>=16000 and first_T<=40000:
         line_crop = np.loadtxt(os.path.join(PIPELINE_DATA_DIR, 'line_crop.dat'),skiprows=1,max_rows=4) #exclude Halpha. It is needed in exception
@@ -61,7 +61,7 @@ def snow_white(
 
     #with open(os.path.join(PIPELINE_DATA_DIR, 'training_file_v3'), 'rb') as f:
     with open(os.path.join(PIPELINE_DATA_DIR, '20240801_training_file'), 'rb') as f:        
-        kf = pickle._load(f, fix_imports=True)
+        kf = pickle.load(f, fix_imports=True)
 
 
     wref = np.load(os.path.join(PIPELINE_DATA_DIR, "wref_sdss.npy"))
@@ -98,16 +98,25 @@ def snow_white(
             labels = get_line_info_v3.line_info(*data_args)
             predictions = kf.predict(labels.reshape(1, -1))
             probs = kf.predict_proba(labels.reshape(1, -1))
-            
-            first = probs[0][kf.classes_==predictions[0]]
+            prob_arr = probs[0]
+            idx_pred = np.where(kf.classes_ == predictions[0])[0][0]
+            first = prob_arr[idx_pred]
+            #first = probs[0][kf.classes_==predictions[0]]
             if first >= 0.5:
                 classification = predictions[0]
             else:
-                second = sorted(probs[0])[-2]
-                if second/first>0.6:
-                    classification = predictions[0]+"/"+kf.classes_[probs[0]==second]
+                sorted_idx = np.argsort(prob_arr)
+                second_idx = sorted_idx[-2]
+                second = prob_arr[second_idx]
+                if second/first > 0.6:
+                    classification = f"{predictions[0]}/{kf.classes_[second_idx]}"
                 else:
-                    classification = predictions[0]+":"
+                    classification = predictions[0] + ":"
+                #second = sorted(probs[0])[-2]
+                #if second/first>0.6:
+                #    classification = predictions[0]+"/"+kf.classes_[probs[0]==second]
+                #else:
+                #    classification = predictions[0]+":"
 
             result_kwds = dict(
                 source_pk=spectrum.source_pk,
@@ -123,7 +132,7 @@ def snow_white(
 
             else:
                 # Fit DA-type
-                spectra=np.stack((data_args),axis=-1)
+                spectra=np.stack(data_args,axis=-1)
                 spectra = spectra[(np.isnan(spectra[:,1])==False) & (spectra[:,0]>3600)& (spectra[:,0]<9800)]
                 spec_w=spectrum.wavelength
 
@@ -141,11 +150,11 @@ def snow_white(
                 first_g=800
                 initial=0
                 tl= pd.read_csv(os.path.join(PIPELINE_DATA_DIR, 'reference_phot_tlogg.csv'))
-                sourceID=np.array(tl[u'source_id']).astype(str)
-                T_H=np.array(tl[u'teff_H']).astype(float)
-                log_H=np.array(tl[u'logg_H']).astype(float)
-                eT_H=np.array(tl[u'eteff_H']).astype(float)
-                elog_H=np.array(tl[u'elogg_H']).astype(float)
+                sourceID=np.array(tl['source_id']).astype(str)
+                T_H=np.array(tl['teff_H']).astype(float)
+                log_H=np.array(tl['logg_H']).astype(float)
+                eT_H=np.array(tl['eteff_H']).astype(float)
+                elog_H=np.array(tl['elogg_H']).astype(float)
                 GaiaID=str(spectrum.source.gaia_dr3_source_id)
                 if GaiaID in sourceID: #if there is a photometric solution use that as starting point
                     first_T=T_H[sourceID==GaiaID][0]
@@ -181,7 +190,7 @@ def snow_white(
                 prob_list=[7.6,7.9,8.0,8.1,8.2,8.3,8.4,8.5,8.7,8.9]
                 if round(new_best.params['logg'].value/100,4) in prob_list:
                      fit_params['logg'] = lmfit.Parameter(name="logg",value=800,min=601,max=949)
-                     new_best=refit(fit_params,spec_nl,emu,wref)    
+                     new_best=refit(fit_params,spec_nl,spec_w,emu,wref)    
 
                 best_T=new_best.params['teff'].value
                 #best_Te=new_best.params['teff'].stderr
@@ -198,16 +207,12 @@ def snow_white(
                 best_Te=err_best.params['teff'].stderr
                 best_ge=err_best.params['logg'].stderr
                 
-                if best_Te==None:
+                if best_Te is None:
                     best_Te=0.0 
-                if best_ge==None:
+                if best_ge is None:
                     best_ge=0.0
                 if initial ==1:
-                    esult_kwds.update(
-                        teff=best_T,
-                        e_teff=best_Te,
-                        logg=best_g/100,
-                        e_logg=best_ge/100)
+                    result_kwds.update(teff=best_T,e_teff=best_Te,logg=best_g/100,e_logg=best_ge/100)
                     
                 elif initial ==0: #if initial guess not from photometric result need to repeat for hot/cold solution
                     fit_params = lmfit.Parameters()
@@ -237,7 +242,7 @@ def snow_white(
                 #====================find second solution ==============================================
                     second_best= lmfit.minimize(fitting_scripts.line_func_rv,fit_params,args=(spec_nl,l_crop,emu,wref),method="least_squares",loss='soft_l1')
                     if round(second_best.params['logg'].value/100,4) in prob_list:
-                        second_best=refit(fit_params,spec_nl,emu,wref)
+                        second_best=refit(fit_params,spec_nl,spec_w, emu,wref)
                     best_T2=second_best.params['teff'].value
                     #best_Te2=second_best.params['teff'].stderr
                     best_g2=second_best.params['logg'].value
