@@ -9,7 +9,7 @@ hide-toc: true
 :hidden:
 
 user/install
-user/datamodels
+user/datamodels/index
 user/pipelines/index
 user/flags
 user/glossary
