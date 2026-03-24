@@ -1,6 +1,7 @@
 import concurrent.futures
 import subprocess
 import numpy as np
+from datetime import datetime
 from peewee import JOIN, chunked, Case, fn, SQL, EXCLUDED, IntegrityError
 from typing import Optional
 
@@ -971,6 +972,7 @@ def migrate_sdss4_dr17_apogee_spectra_from_sdss5_catalogdb(batch_size: Optional[
 
     from astra.migrations.sdss5db.catalogdb import (
         SDSS_DR17_APOGEE_Allvisits as Visit,
+        AllStar_DR17_synspec_rev1 as Star
     )
 
     # Query visit spectra directly
@@ -1145,25 +1147,57 @@ def migrate_sdss4_dr17_apogee_spectra_from_sdss5_catalogdb(batch_size: Optional[
         )
         query_step.update(total=len(dr17_rows), completed=len(dr17_rows))
 
+    # Lookup additional information
+    q = (
+        Star
+        .select(
+            Star.apogee_id.alias("obj"),
+            Star.telescope,
+            Star.field,
+            Star.snr,
+            Star.meanfib.alias("mean_fiber"),
+            Star.sigfib.alias("std_fiber"),
+            Star.vhelio_avg.alias("v_rad"),
+            Star.verr.alias("e_v_rad"),
+            Star.vscatter.alias("std_v_rad"),
+            Star.rv_teff.alias("doppler_teff"),
+            Star.rv_logg.alias("doppler_logg"),
+            Star.rv_feh.alias("doppler_fe_h"),
+            Star.rv_chi2.alias("doppler_rchi2"),
+            Star.rv_flag.alias("doppler_flags"),
+            Star.rv_ccfwhm.alias("ccfwhm"),
+            Star.rv_autofwhm.alias("autofwhm"),
+            Star.starflag.alias("spectrum_flags"),
+        )
+        .dicts()
+    )
+    star_meta = {
+        (s["obj"], s["field"], s["telescope"]): s for s in q
+    }
+
+
     with queue.subtask("Processing APOGEE DR17 coadded spectra", total=len(dr17_rows)) as process_step:
         apogee_coadded_spectra = []
         for obj, field, telescope in dr17_rows:
             source_pk = lookup_source_pk_given_sdss4_apogee_id.get(obj)
             if source_pk is not None:
-                apogee_coadded_spectra.append(
-                    dict(
-                        source_pk=source_pk,
-                        release="dr17",
-                        filetype="apStar",
-                        apred="dr17",
-                        apstar="stars",
-                        obj=obj,
-                        telescope=telescope,
-                        field=field,
-                        prefix="ap" if telescope.startswith("apo") else "as",
-                    )
+
+                key = (obj, field, telescope)
+                s = dict(
+                    source_pk=source_pk,
+                    release="dr17",
+                    filetype="apStar",
+                    apred="dr17",
+                    apstar="stars",
+                    obj=obj,
+                    telescope=telescope,
+                    field=field,
+                    prefix="ap" if telescope.startswith("apo") else "as",
                 )
+                s.update(star_meta[key])
+                apogee_coadded_spectra.append(s)
         process_step.update(completed=len(dr17_rows))
+
 
     # Upsert the spectra
     pks = upsert_many(
@@ -1174,6 +1208,44 @@ def migrate_sdss4_dr17_apogee_spectra_from_sdss5_catalogdb(batch_size: Optional[
         queue,
         "Upserting APOGEE DR17 coadded spectra"
     )
+
+    # Update existing spectra with new information if it exists.
+    for chunk in tqdm(chunked(apogee_coadded_spectra, batch_size), desc="Updating"):
+        (
+            ApogeeCoaddedSpectrumInApStar
+            .insert_many(chunk)
+            .on_conflict(
+                conflict_target=[
+                    ApogeeCoaddedSpectrumInApStar.release,
+                    ApogeeCoaddedSpectrumInApStar.apred,
+                    ApogeeCoaddedSpectrumInApStar.apstar,
+                    ApogeeCoaddedSpectrumInApStar.obj,
+                    ApogeeCoaddedSpectrumInApStar.telescope,
+                    ApogeeCoaddedSpectrumInApStar.field,
+                    ApogeeCoaddedSpectrumInApStar.prefix,
+                ],
+                preserve=(
+                    ApogeeCoaddedSpectrumInApStar.snr,
+                    ApogeeCoaddedSpectrumInApStar.mean_fiber,
+                    ApogeeCoaddedSpectrumInApStar.std_fiber,
+                    ApogeeCoaddedSpectrumInApStar.v_rad,
+                    ApogeeCoaddedSpectrumInApStar.e_v_rad,
+                    ApogeeCoaddedSpectrumInApStar.std_v_rad,
+                    ApogeeCoaddedSpectrumInApStar.doppler_teff,
+                    ApogeeCoaddedSpectrumInApStar.doppler_logg,
+                    ApogeeCoaddedSpectrumInApStar.doppler_fe_h,
+                    ApogeeCoaddedSpectrumInApStar.doppler_rchi2,
+                    ApogeeCoaddedSpectrumInApStar.doppler_flags,
+                    ApogeeCoaddedSpectrumInApStar.ccfwhm,
+                    ApogeeCoaddedSpectrumInApStar.autofwhm,
+                    ApogeeCoaddedSpectrumInApStar.spectrum_flags,
+                ),
+                update={
+                    ApogeeCoaddedSpectrumInApStar.modified: datetime.now()
+                }
+            )
+            .execute()
+        )
 
     # Assign spectrum_pk values to any spectra missing it.
     N = len(pks)
@@ -1198,3 +1270,133 @@ def migrate_sdss4_dr17_apogee_spectra_from_sdss5_catalogdb(batch_size: Optional[
     queue.put(Ellipsis)
 
     return None
+
+
+def update_apogee_combined_spectra_from_coadds(batch_size=500, queue=None):
+    """
+    Update ApogeeCombinedSpectrum rows with field values from ApogeeCoaddedSpectrumInApStar
+    where the coadd rows have since been populated (but the combined rows still have nulls).
+
+    Joins on source_pk, apred, and telescope.
+    """
+    from astra.models.base import database
+    from astra.models.apogee import ApogeeCoaddedSpectrumInApStar
+    from astra.models.mwm import ApogeeCombinedSpectrum
+
+    queue = queue or ProgressContext()
+
+    # These are the fields that exist on both models and could have been null
+    # when ApogeeCombinedSpectrum was first created.
+    shared_fields = [
+        "min_mjd",
+        "max_mjd",
+        "n_entries",
+        "n_visits",
+        "n_good_visits",
+        "n_good_rvs",
+        "snr",
+        "mean_fiber",
+        "std_fiber",
+        "spectrum_flags",
+        "v_rad",
+        "e_v_rad",
+        "std_v_rad",
+        "median_e_v_rad",
+        "doppler_teff",
+        "doppler_e_teff",
+        "doppler_logg",
+        "doppler_e_logg",
+        "doppler_fe_h",
+        "doppler_e_fe_h",
+        "doppler_rchi2",
+        "doppler_flags",
+        "xcorr_v_rad",
+        "xcorr_v_rel",
+        "xcorr_e_v_rel",
+        "ccfwhm",
+        "autofwhm",
+        "n_components",
+    ]
+
+    Coadd = ApogeeCoaddedSpectrumInApStar
+    Combined = ApogeeCombinedSpectrum
+
+    # Find ApogeeCombinedSpectrum rows where at least one shared field is null,
+    # but the corresponding ApogeeCoaddedSpectrumInApStar row has non-null values.
+    # We use snr as a representative field: if it's null on Combined but not on Coadd,
+    # the row likely needs updating.
+    q = (
+        Combined
+        .select(Combined.pk, Combined.source_pk, Combined.apred, Combined.telescope)
+        .join(
+            Coadd,
+            on=(
+                (Combined.source_pk == Coadd.source_pk)
+                & (Combined.apred == Coadd.apred)
+                & (Combined.telescope == Coadd.telescope)
+            ),
+        )
+        .where(
+            Combined.snr.is_null()
+            & Coadd.snr.is_null(False)
+        )
+        .tuples()
+    )
+
+    rows_to_update = list(q)
+    n_total = len(rows_to_update)
+    log.info(f"Found {n_total} ApogeeCombinedSpectrum rows to update from ApogeeCoaddedSpectrumInApStar")
+
+    if n_total == 0:
+        queue.put(Ellipsis)
+        return 0
+
+    n_updated = 0
+    with queue.subtask(f"Updating {n_total} ApogeeCombinedSpectrum rows", total=n_total) as step:
+        for batch in chunked(rows_to_update, batch_size):
+            # Build a mapping of (source_pk, apred, telescope) -> combined_pk for this batch
+            keys = [(source_pk, apred, telescope) for (_, source_pk, apred, telescope) in batch]
+            combined_pks = [pk for (pk, _, _, _) in batch]
+
+            # Fetch the corresponding coadd rows
+            coadd_rows = (
+                Coadd
+                .select()
+                .where(
+                    fn.ROW(Coadd.source_pk, Coadd.apred, Coadd.telescope).in_(keys)
+                )
+                .dicts()
+            )
+
+            coadd_lookup = {}
+            for row in coadd_rows:
+                key = (row["source_pk"], row["apred"], row["telescope"])
+                coadd_lookup[key] = row
+
+            with database.atomic():
+                for combined_pk, source_pk, apred, telescope in batch:
+                    coadd_row = coadd_lookup.get((source_pk, apred, telescope))
+                    if coadd_row is None:
+                        continue
+
+                    updates = {}
+                    for field_name in shared_fields:
+                        coadd_value = coadd_row.get(field_name)
+                        if coadd_value is not None:
+                            updates[field_name] = coadd_value
+
+                    if updates:
+                        updates["modified"] = datetime.now()
+                        (
+                            Combined
+                            .update(**updates)
+                            .where(Combined.pk == combined_pk)
+                            .execute()
+                        )
+                        n_updated += 1
+
+            step.update(advance=len(batch))
+
+    log.info(f"Updated {n_updated} ApogeeCombinedSpectrum rows")
+    queue.put(Ellipsis)
+    return n_updated
