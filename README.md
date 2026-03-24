@@ -1,6 +1,8 @@
 astra
 =====
 
+[![Tests](https://github.com/andycasey/astra/actions/workflows/ci.yml/badge.svg)](https://github.com/andycasey/astra/actions/workflows/ci.yml)
+[![Coverage](https://coveralls.io/repos/github/andycasey/astra/badge.svg?branch=main)](https://coveralls.io/github/andycasey/astra?branch=main)
 [![Documentation](https://readthedocs.org/projects/sdss-astra/badge/?version=latest)](https://sdss-astra.readthedocs.io/en/latest/)
 [![Version](https://img.shields.io/github/v/tag/andycasey/astra?label=version)](https://github.com/andycasey/astra)
 
