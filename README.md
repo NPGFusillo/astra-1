@@ -1,6 +1,9 @@
 astra
 =====
 
+[![Documentation](https://readthedocs.org/projects/sdss-astra/badge/?version=latest)](https://sdss-astra.readthedocs.io/en/latest/)
+[![Version](https://img.shields.io/github/v/tag/andycasey/astra?label=version)](https://github.com/andycasey/astra)
+
 The analysis framework for the Sloan Digital Sky Survey.
 
 Astra is the analysis framework for the Sloan Digital Sky Survey (SDSS-V) Milky
