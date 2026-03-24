@@ -13,8 +13,8 @@ def skippy(*args, **kwargs):
 
 
 with DAG(
-    "astra", 
-    start_date=datetime(2024, 11, 14), # datetime(2014, 7, 18), 
+    "astra",
+    start_date=datetime(2024, 11, 14), # datetime(2014, 7, 18),
     schedule="0 12 * * *", # 8 am ET
     max_active_runs=1,
     dagrun_timeout=timedelta(days=7),
@@ -41,7 +41,7 @@ with DAG(
     with TaskGroup(group_id="SpectrumProducts") as spectrum_products:
         (
             BashOperator(
-                task_id="mwmVisit_mwmStar", 
+                task_id="mwmVisit_mwmStar",
                 bash_command='astra srun astra.products.mwm.create_mwmVisit_and_mwmStar_products --nodes 10 --procs 4 --time="96:00:00"'
             )
         )
@@ -57,7 +57,7 @@ with DAG(
             BashOperator(
                 task_id="create_all_star_product",
                 bash_command="astra create astraAllStarAPOGEENet --overwrite"
-            )                
+            )
         )
         (
             BashOperator(
@@ -87,12 +87,12 @@ with DAG(
                 bash_command="astra create astraAllStarASPCAP --overwrite"
             )
         )
-    
+
     with TaskGroup(group_id="BOSSNet") as bossnet:
         (
             BashOperator(
                 task_id="star",
-                bash_command='astra srun bossnet mwm.BossCombinedSpectrum --limit 250000 --mem=16000 --gres="gpu:v100" --account="notchpeak-gpu" --time="48:00:00"'
+                bash_command='astra srun bossnet BossCombinedSpectrum --limit 250000 --mem=16000 --gres="gpu:v100" --account="notchpeak-gpu" --time="48:00:00"'
             )
 
         ) >> (
@@ -117,7 +117,7 @@ with DAG(
         (
             BashOperator(
                 task_id="star",
-                bash_command='astra srun line_forest mwm.BossCombinedSpectrum --limit 250000 --nodes 1 --time="48:00:00"'
+                bash_command='astra srun line_forest BossCombinedSpectrum --limit 250000 --nodes 1 --time="48:00:00"'
             )
         ) >> (
             BashOperator(
@@ -137,6 +137,20 @@ with DAG(
             )
         )
 
+    with TaskGroup(group_id="Slam") as slam:
+        (
+            BashOperator(
+                task_id="star",
+                bash_command='astra srun slam BossCombinedSpectrum --limit 250000 --nodes 4 --time="48:00:00"'
+            )
+        ) >> (
+            BashOperator(
+                task_id="create_all_star_product",
+                bash_command="astra create astraAllStarSlam --overwrite"
+            )
+        )
+
+    # MDwarfType, Corv, ThePayne,
 
     with TaskGroup(group_id="AstroNN") as astronn:
         astronn_star = BashOperator(
@@ -147,7 +161,7 @@ with DAG(
             BashOperator(
                 task_id="create_all_star_product",
                 bash_command="astra create astraAllStarAstroNN --overwrite"
-            )                
+            )
         )
         (
             BashOperator(
@@ -173,7 +187,7 @@ with DAG(
                     bash_command="astra create astraAllStarAstroNNdist --overwrite"
                 )
             )
-        
+
 
         skipper = PythonOperator(
             task_id="skipper",
@@ -191,4 +205,3 @@ with DAG(
     #task_migrate >> apogeenet
     #(task_migrate, apogeenet_star) >> aspcap
     #apogeenet_star >> aspcap
-

@@ -536,21 +536,6 @@ def link_apogee_spectra_to_sources(batch_size: int = 1000, queue=None):
 
     if unlinked_count > 0:
         with queue.subtask("Linking APOGEE visit spectra to sources", total=unlinked_count) as link_step:
-            # First try to link by sdss_id (most reliable for SDSS5)
-            with database.atomic():
-                updated = (
-                    ApogeeVisitSpectrum
-                    .update(source_pk=Source.pk)
-                    .from_(Source)
-                    .where(
-                        ApogeeVisitSpectrum.source.is_null()
-                        & (ApogeeVisitSpectrum.sdss_id == Source.sdss_id)
-                        & (ApogeeVisitSpectrum.sdss_id > 0)
-                    )
-                    .execute()
-                )
-            n_linked += updated
-            link_step.update(advance=updated)
 
             # Try linking DR17 spectra by sdss4_apogee_id (stored in obj field)
             with database.atomic():
@@ -593,24 +578,10 @@ def link_apogee_spectra_to_sources(batch_size: int = 1000, queue=None):
         .count()
     )
 
+    # TODO: not even clear how to link these here... need to
+    """
     if unlinked_coadd_count > 0:
         with queue.subtask("Linking APOGEE coadded spectra to sources", total=unlinked_coadd_count) as coadd_step:
-            # Link by sdss_id
-            with database.atomic():
-                updated = (
-                    ApogeeCoaddedSpectrumInApStar
-                    .update(source_pk=Source.pk)
-                    .from_(Source)
-                    .where(
-                        ApogeeCoaddedSpectrumInApStar.source.is_null()
-                        & (ApogeeCoaddedSpectrumInApStar.sdss_id == Source.sdss_id)
-                        & (ApogeeCoaddedSpectrumInApStar.sdss_id > 0)
-                    )
-                    .execute()
-                )
-            n_linked += updated
-            coadd_step.update(advance=updated)
-
             # Link by catalogid
             for catalogid_field in (Source.catalogid, Source.catalogid31, Source.catalogid25, Source.catalogid21):
                 with database.atomic():
@@ -627,7 +598,7 @@ def link_apogee_spectra_to_sources(batch_size: int = 1000, queue=None):
                     )
                 n_linked += updated
                 coadd_step.update(advance=updated)
-
+    """
     return n_linked
 
 

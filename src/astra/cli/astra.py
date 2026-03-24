@@ -549,6 +549,7 @@ def run(
     limit: Annotated[int, typer.Option(help="Limit the number of spectra.", min=1)] = None,
     page: Annotated[int, typer.Option(help="Page to start results from (`limit` spectra per `page`).", min=1)] = None,
     live_renderable_path: Annotated[str, typer.Option(hidden=True)] = None,
+    dry_run: Annotated[bool, typer.Option(help="Print the queries that would be run without executing them.")] = False
 ):
     """Run an Astra task on spectra."""
 
@@ -608,10 +609,16 @@ def run(
                 if use_local_renderable:
                     task_id = overall_progress.add_task(model.__name__)
                     overall_progress.update(task_id, total=total)
-                    for r in worker:
-                        overall_progress.update(task_id, advance=1, refresh=True)
+                    if dry_run:
+                        from time import sleep
+                        for r in range(total):
+                            overall_progress.update(task_id, advance=1, refresh=True)
+                            sleep(1)
+                    else:
+                        for r in worker:
+                            overall_progress.update(task_id, advance=1, refresh=True)
                     #overall_progress.update(task_id, refresh=True, completed=True)
-                else:
+                elif not dry_run:
                     for r in worker:
                         pass
 
@@ -919,7 +926,7 @@ def migrate(
             name="visit_counts",
             func=update_visit_spectra_counts,
             description="Updating visit spectra counts",
-            depends_on={"sdss_id_fields"},  # Only needs sources to exist
+            depends_on={"targeting_cartons"},  # Only needs sources to exist
             writes_to={"source"}
         )
         tasks["w1w2_mags"] = MigrationTask(

@@ -5,6 +5,7 @@ from typing import Iterable, Optional
 from astra.pipelines.ferre.operator import post_execution_interpolation
 from astra.pipelines.ferre import utils
 from astra.utils import log, dict_to_list, expand_path
+import warnings
 
 LARGE = 1e10 # TODO: This is also defined in pre_process, move it common
 
@@ -31,8 +32,8 @@ def pre_process_ferre(plans):
             input_nml_paths.append(input_nml_path_[len(abundance_dir) + 1:]) # ppaths too long
             total += n_obj_
             for spectrum, kwds in skipped_:
-                skipped.append((spectrum, kwds))        
-        
+                skipped.append((spectrum, kwds))
+
         # Create a FERRE list file.
         input_nml_path = os.path.join(abundance_dir, "input_list.nml")
         with open(input_nml_path, "w") as fp:
@@ -90,8 +91,8 @@ def _pre_process_ferre(
 ):
 
     if remove_existing_output_files:
-        os.system(f"rm -f {pwd}/*.output* {pwd}/stdout* {pwd}/stderr*")    
-    
+        os.system(f"rm -f {pwd}/*.output* {pwd}/stdout* {pwd}/stderr*")
+
     if kwargs:
         log.warning(f"astra.pipelines.ferre.pre_process.pre_process ignoring kwargs: {kwargs}")
 
@@ -173,8 +174,8 @@ def _pre_process_ferre(
             except:
                 #log.warning(f"Exception accessing pixel arrays for spectrum {spectrum}")
                 skipped.append((spectrum, {"flag_spectrum_io_error": True}))
-                continue       
-            
+                continue
+
 
             try:
                 pixel_flags = np.copy(spectrum.pixel_flags)
@@ -202,10 +203,10 @@ def _pre_process_ferre(
                 if n_bad_pixels >= max_num_bad_pixels:
                     if not has_warned_on_bad_pixels:
                         log.warning(f"Spectrum {spectrum} has too many bad pixels ({n_bad_pixels} > {max_num_bad_pixels}). Other spectra like this in the same FERRE job will have their warnings suppressed.")
-                        has_warned_on_bad_pixels = True                        
+                        has_warned_on_bad_pixels = True
                     skipped.append((spectrum, {"flag_too_many_bad_pixels": True}))
                     continue
-                
+
             if pre_computed_continuum is not None:
                 continuum = pre_computed_continuum[index]
                 flux /= continuum
@@ -214,7 +215,7 @@ def _pre_process_ferre(
             #bad = ((flux < 0) | (e_flux <= 0))
             #flux[bad] = 0.01
             e_flux = np.clip(e_flux, 0.005, np.inf)
-            
+
             batch_flux.append(flux[mask])
             batch_e_flux.append(e_flux[mask])
 
@@ -231,9 +232,9 @@ def _pre_process_ferre(
     batch_e_flux = np.array(batch_e_flux)
     if np.any(batch_e_flux < 0):
         bad = batch_e_flux < 0
-        batch_e_flux[bad] = LARGE        
+        batch_e_flux[bad] = LARGE
         log.warning(f"{np.sum(bad):.0} pixels had error values below 0!")
-    
+
     #if len(skipped) > 0:
     #    log.warning(f"Skipping {len(skipped)} spectra ({100 * len(skipped) / len(spectra):.0f}%; of {len(spectra)})")
 
@@ -248,7 +249,7 @@ def _pre_process_ferre(
     else:
         control_kwds["synthfile(1)"] = os.path.basename(synthfile_full_path)
 
-    # Create directory and write the control file        
+    # Create directory and write the control file
     os.makedirs(absolute_pwd, exist_ok=True)
 
     # Copy filter file to absolute pwd.
@@ -276,7 +277,7 @@ def _pre_process_ferre(
             target_path_prefix = f"{absolute_pwd}/../{os.path.basename(synthfile_full_path)}"[:-4]
     else:
         target_path_prefix = f"{absolute_pwd}/{os.path.basename(synthfile_full_path)}"[:-4]
-    
+
     if target_path_prefix is not None:
         for suffix in ("hdr", "unf"):
             if not os.path.exists(f"{target_path_prefix}.{suffix}"):
@@ -285,7 +286,7 @@ def _pre_process_ferre(
 
 
     with open(os.path.join(absolute_pwd, "input.nml"), "w") as fp:
-        fp.write(control_kwds_formatted)       
+        fp.write(control_kwds_formatted)
 
     # hack: we do basename here in case we wrote the prefix to PFILE for the abundances run
     with open(os.path.join(absolute_pwd, os.path.basename(control_kwds["pfile"])), "w") as fp:
@@ -313,11 +314,11 @@ def _pre_process_ferre(
         batch_e_flux[~finite_e_flux] = LARGE
         if not np.any(finite_e_flux):
             log.warning(f"ALL flux errors are non-finite!")
-            
+
         savetxt_kwds = dict(fmt="%.4e")#footer="\n")
         np.savetxt(flux_path, batch_flux, **savetxt_kwds)
         np.savetxt(e_flux_path, batch_e_flux, **savetxt_kwds)
-    
+
     #if reference_pixel_arrays_for_abundance_run:
     #    for basename in (control_kwds["ffile"], control_kwds["erfile"]):
     #        os.system(f"ln -s {absolute_pwd}/../{basename} {absolute_pwd}/{basename}")
@@ -335,10 +336,10 @@ def inflate_errors_at_bad_pixels(
     spike_threshold_to_inflate_uncertainty=3,
     min_sigma_value=0.05,
 ):
-    
+
     flux = np.copy(flux)
     e_flux = np.copy(e_flux)
-    
+
     # Inflate errors around skylines,
     skyline_mask = (bitfield & 4096) > 0 # significant skyline
     e_flux[skyline_mask] *= skyline_sigma_multiplier
@@ -368,7 +369,7 @@ def inflate_errors_at_bad_pixels(
         e_flux[is_spike] = bad_pixel_error_value
 
     # Set bad pixels to have no useful data.
-    if bad_pixel_flux_value is not None or bad_pixel_error_value is not None:                            
+    if bad_pixel_flux_value is not None or bad_pixel_error_value is not None:
         bad = (
             ~np.isfinite(flux)
             | ~np.isfinite(e_flux)
@@ -378,7 +379,7 @@ def inflate_errors_at_bad_pixels(
         )
 
         flux[bad] = bad_pixel_flux_value
-        e_flux[bad] = bad_pixel_error_value        
+        e_flux[bad] = bad_pixel_error_value
 
     if min_sigma_value is not None:
         e_flux = np.clip(e_flux, min_sigma_value, np.inf)
@@ -393,7 +394,7 @@ def _get_ferre_chip_mask(observed_wavelength, chip_wavelengths):
         s_index = observed_wavelength.searchsorted(model_wavelength[0])
         e_index = s_index + model_wavelength.size
         mask[s_index:e_index] = True
-    return mask                    
+    return mask
 
 
 def post_process_ferre(input_nml_path, pwd, **kwargs) -> list[dict]:
@@ -407,7 +408,7 @@ def post_process_ferre(input_nml_path, pwd, **kwargs) -> list[dict]:
     # TODO: this might be slow we can probably use -l mode
     for path in input_nml_paths:
         post_execution_interpolation(path, pwd)
-    
+
     v = []
     for path in input_nml_paths:
         v.extend(list(_post_process_ferre(path, pwd, skip_pixel_arrays=True, **kwargs)))
@@ -420,7 +421,7 @@ def _post_process_ferre(input_nml_path, pwd=None, skip_pixel_arrays=False, **kwa
 
     :param dir:
         The working directory of the FERRE execution.
-    
+
     :param pwd: [optional]
         The directory where FERRE was actually executed from. Normally `pwd` and `dir` will always be
         the same, so this keyword argument is optional. However, if FERRE is run in abundance mode
@@ -438,10 +439,10 @@ def _post_process_ferre(input_nml_path, pwd=None, skip_pixel_arrays=False, **kwa
     control_kwds = utils.read_control_file(input_nml_path)
 
     # Load input files.
-    input_names, input_parameters = utils.read_input_parameter_file(pwd, control_kwds)   
+    input_names, input_parameters = utils.read_input_parameter_file(pwd, control_kwds)
     N = len(input_names)
 
-    # Load and sort the rectified model flux path because this happens in abundances when we would normally use skip_pixel_arrays=True    
+    # Load and sort the rectified model flux path because this happens in abundances when we would normally use skip_pixel_arrays=True
     parameter_input_path = os.path.join(pwd, control_kwds["PFILE"])
     for key in ("OFFILE", "OPFILE", "SFFILE"):
         path = os.path.join(pwd, control_kwds[key])
@@ -462,7 +463,7 @@ def _post_process_ferre(input_nml_path, pwd=None, skip_pixel_arrays=False, **kwa
         names_with_missing_outputs = input_names
     """
 
-    # Create some boolean flags. 
+    # Create some boolean flags.
     header_path = control_kwds["SYNTHFILE(1)"]
     if not os.path.exists(header_path):
         header_path = os.path.join(pwd, header_path)
@@ -489,9 +490,9 @@ def _post_process_ferre(input_nml_path, pwd=None, skip_pixel_arrays=False, **kwa
     short_grid_name = utils.parse_header_path(header_path)["short_grid_name"]
 
     common = dict(
-        header_path=header_path, 
+        header_path=header_path,
         short_grid_name=short_grid_name,
-        pwd=pwd, 
+        pwd=pwd,
         ferre_n_obj=len(input_names),
         n_threads=control_kwds["NTHREADS"],
         interpolation_order=control_kwds["INTER"],
@@ -519,8 +520,8 @@ def _post_process_ferre(input_nml_path, pwd=None, skip_pixel_arrays=False, **kwa
             initial_flags=name_meta["initial_flags"] or 0,
             ferre_name=name,
             ferre_index=name_meta["index"],
-            rchi2=10**meta["log_chisq_fit"][i], 
-            penalized_rchi2=10**meta["log_chisq_fit"][i],     
+            rchi2=10**meta["log_chisq_fit"][i],
+            penalized_rchi2=10**meta["log_chisq_fit"][i],
             ferre_log_snr_sq=meta["log_snr_sq"][i],
             flag_ferre_fail=flag_any_ferre_fail[i],
             #flag_potential_ferre_timeout=flag_potential_ferre_timeout[i],
@@ -536,11 +537,11 @@ def _post_process_ferre(input_nml_path, pwd=None, skip_pixel_arrays=False, **kwa
             if e_value <= 0 or e_value >= 9999:
                 e_value = np.nan
                 flag_ferre_fail[i, j] = True # TODO: should we have more specific flags here?
-            
+
             if parameter != "teff" and (value >= 9999 or value <= -9999):
                 value = np.nan
                 flag_ferre_fail[i, j] = True
-                
+
             result.update({
                 f"initial_{parameter}": input_parameters[i, j],
                 parameter: value,
@@ -551,7 +552,7 @@ def _post_process_ferre(input_nml_path, pwd=None, skip_pixel_arrays=False, **kwa
             })
 
         yield result
-        
+
 
 import numpy as np
 import os
@@ -572,11 +573,11 @@ def get_new_path(existing_path, new_suffix):
         return ".".join(existing_path.split(".")[:-1]) + f".{new_suffix}"
 
 
-def re_process_partial_ferre(existing_input_nml_path, pwd=None, exclude_indices=None): 
+def re_process_partial_ferre(existing_input_nml_path, pwd=None, exclude_indices=None):
 
     if pwd is None:
         pwd = os.path.dirname(existing_input_nml_path)
-    
+
     existing_suffix = get_suffix(existing_input_nml_path)
     new_suffix = existing_suffix + 1
 
@@ -584,7 +585,7 @@ def re_process_partial_ferre(existing_input_nml_path, pwd=None, exclude_indices=
 
     with open(existing_input_nml_path, "r") as f:
         lines = f.readlines()
-    
+
     keys = ("PFILE", "OFFILE", "ERFILE", "OPFILE", "FFILE", "SFFILE")
     paths = {}
     for i, line in enumerate(lines):
@@ -599,13 +600,13 @@ def re_process_partial_ferre(existing_input_nml_path, pwd=None, exclude_indices=
             new_relative_path = get_new_path(existing_relative_path, new_suffix)
             lines[i] = line[:line.index("=")] + f"= '{new_relative_path}'"
             paths[key] = (existing_relative_path, new_relative_path)
-    
+
     with open(new_input_nml_path, "w") as fp:
         fp.write("".join(lines))
 
     # TODO: copy input files to this directory because otherwise we will have partial flux files
     #       in the parent directory and it gets impossible to track
-    
+
     # Find the things that are already written in all three output files.
     output_path_keys = ["OFFILE", "OPFILE"]
     if os.path.exists(os.path.join(pwd, paths["SFFILE"][0])):
@@ -632,7 +633,7 @@ def re_process_partial_ferre(existing_input_nml_path, pwd=None, exclude_indices=
         existing_path, new_path = paths[key]
         with open(os.path.join(pwd, existing_path), "r") as f:
             lines = f.readlines()
-        
+
         with open(os.path.join(pwd, new_path), "w") as f:
             for line, m in zip(lines, mask):
                 if m:
@@ -643,10 +644,10 @@ def re_process_partial_ferre(existing_input_nml_path, pwd=None, exclude_indices=
         existing_path, new_path = paths[key]
         with open(os.path.join(pwd, existing_path), "r") as f:
             lines = f.readlines()
-        
+
         lines = [line for line in lines if line.split()[0].strip() in completed_names]
         with open(os.path.join(pwd, existing_path) + ".cleaned", "w") as fp:
             fp.write("".join(lines))
-        
+
     ignore_names = list(ignore_names)
     return (new_input_nml_path, ignore_names)

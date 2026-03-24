@@ -17,19 +17,19 @@ def _pre_compute_continuum(coarse_result, spectrum, pre_continuum):
         pre_computed_continuum = pre_continuum.fit(spectrum, coarse_result)
     except:
         log.exception(f"Exception when computing continuum for spectrum {spectrum} from coarse result {coarse_result}:")
-        return (spectrum.spectrum_pk, None)
+        return (spectrum.spectrum_pk, 1)
     else:
         return (spectrum.spectrum_pk, pre_computed_continuum)
 
 
 def plan_stellar_parameters_stage(spectra, parent_dir, coarse_results, weight_path, pre_continuum=MedianFilter, **kwargs):
-        
+
     best_coarse_results = {}
     for kwds in coarse_results:
         this = FerreCoarse(**kwds)
         # TODO: Make the penalized rchi2 a property of the FerreCoarse class.
         this.penalized_rchi2 = penalize_coarse_stellar_parameter_result(this)
-            
+
         best = None
         try:
             existing = best_coarse_results[this.spectrum_pk]
@@ -42,17 +42,17 @@ def plan_stellar_parameters_stage(spectra, parent_dir, coarse_results, weight_pa
                 best = existing
             elif this.penalized_rchi2 == existing.penalized_rchi2:
                 best = existing
-                best.flag_multiple_equally_good_coarse_results = True      
-            
+                best.flag_multiple_equally_good_coarse_results = True
+
             if best is None:
                 log.error(f"Error for {kwds} - best is None. {existing} {existing.penalized_rchi2} {this} {this.penalized_rchi2}")
             else:
                 best.ferre_time_coarse = (this.t_elapsed or np.nan) + (existing.t_elapsed or np.nan)
-            
+
             if not np.isfinite(this.penalized_rchi2):
                 best.flag_affected_by_timeout = True
 
-        finally:            
+        finally:
             best_coarse_results[this.spectrum_pk] = best
 
 
@@ -63,7 +63,7 @@ def plan_stellar_parameters_stage(spectra, parent_dir, coarse_results, weight_pa
 
     if pre_continuum is None:
         pre_computed_continuum = { s.spectrum_pk: 1 for s in spectra }
-    else:            
+    else:
         fun = pre_continuum()
 
         futures = []
@@ -96,7 +96,7 @@ def plan_stellar_parameters_stage(spectra, parent_dir, coarse_results, weight_pa
                 initial_alpha_m=r.alpha_m,
                 initial_c_m=r.c_m,
                 initial_n_m=r.n_m,
-                initial_flags=r.initial_flags,                
+                initial_flags=r.initial_flags,
                 upstream_pk=r.task_pk,
             )
         )

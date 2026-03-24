@@ -10,6 +10,7 @@ from airflow.exceptions import AirflowSkipException
 
 REPO_BRANCH = "dev"
 RUN2D = "v6_2_1"
+APRED = "1.5"
 
 def skippy(*args, **kwargs):
     raise AirflowSkipException()
@@ -27,7 +28,7 @@ def is_first_run(**context):
 
 
 with DAG(
-    "DR20",
+    "IPL-4",
     start_date=datetime(2024, 11, 14), # datetime(2014, 7, 18),
     schedule="0 12 * * *", # 8 am ET
     max_active_runs=1,
@@ -37,7 +38,8 @@ with DAG(
 
 
     init = BashOperator(task_id="init", bash_command="astra init")
-    migrate = BashOperator(task_id="migrate", bash_command=f"astra migrate --run2d {RUN2D}")
+    #migrate = BashOperator(task_id="migrate", bash_command=f"astra migrate --run2d {RUN2D} --apred {APRED}")
+    migrate = BashOperator(task_id="migrate", bash_command=f"astra migrate")
 
     begin = EmptyOperator(task_id="begin", trigger_rule="all_done")
 
@@ -51,7 +53,7 @@ with DAG(
         (
             BashOperator(
                 task_id="mwmVisit_mwmStar",
-                bash_command='astra srun astra.products.mwm.create_mwmVisit_and_mwmStar_products --nodes 10 --procs 8 --mem 0 --time="48:00:00"'
+                bash_command='astra srun astra.products.mwm.create_mwmVisit_and_mwmStar_products --nodes 4 --procs 8 --mem 0 --time="48:00:00"'
             )
         )
 
@@ -110,13 +112,19 @@ with DAG(
         )
 
     with TaskGroup(group_id="Slam") as slam:
+        slam_filter = (
+            BashOperator(
+                task_id="slam_filter",
+                bash_command='astra run astra.pipelines.slam.slam_filter BossCombinedSpectrum'
+            )
+        )
         slam_star = (
             BashOperator(
                 task_id="star",
-                bash_command='astra srun slam BossCombinedSpectrum --nodes 8 --limit 250000 --mem 0 --time="96:00:00"'
+                bash_command='astra srun slam BossCombinedSpectrum --nodes 1 --limit 250000 --mem 0 --time="96:00:00"'
             )
         )
-        slam_star >> (
+        slam_filter >> slam_star >> (
             BashOperator(
                 task_id="create_all_star_product",
                 bash_command="astra create astraAllStarSlam --overwrite"
@@ -127,7 +135,7 @@ with DAG(
         mdwarftype_star = (
             BashOperator(
                 task_id="star",
-                bash_command='astra srun mdwarftype BossCombinedSpectrum --nodes 1 --mem 0 --time="48:00:00"'
+                bash_command='astra srun mdwarftype BossCombinedSpectrum --nodes 1 --procs 64 --mem 0 --time="48:00:00"'
             )
         )
         mdwarftype_star >> (
@@ -139,7 +147,7 @@ with DAG(
         (
             BashOperator(
                 task_id="visit",
-                bash_command='astra srun mdwarftype boss.BossVisitSpectrum --nodes 1 --mem 0 --time="48:00:00"'
+                bash_command='astra srun mdwarftype boss.BossVisitSpectrum --nodes 1 --procs 64 --mem 0 --time="48:00:00"'
             )
         ) >> (
             BashOperator(
@@ -182,7 +190,6 @@ with DAG(
 
 
 
-    '''
     with TaskGroup(group_id="ApogeeNet") as apogeenet:
         apogeenet_star = (
             BashOperator(
@@ -216,7 +223,7 @@ with DAG(
                 # To be safe while testing, let's do 4 nodes with 40,000 spectra (should be approx 12 hrs wall time)
                 #bash_command='astra srun aspcap --limit 10000 --nodes 8 --time="48:00:00"'
                 #bash_command='astra srun aspcap --limit 125000 --nodes 10 --time="48:00:00"'
-                bash_command='astra srun aspcap --limit 250000 --nodes 10 --time="48:00:00" --qos=sdss-np-urgent --partition=sdss-np --account=sdss-np'
+                bash_command='astra srun aspcap --limit 250000 --nodes 4 --time="48:00:00" --qos=sdss-np --partition=sdss-np --account=sdss-np'
             )
         ) >> (
             BashOperator(
@@ -265,15 +272,16 @@ with DAG(
             )
 
 
-        skipper = PythonOperator(
-            task_id="skipper",
-            python_callable=skippy,
-        )
-        astronn_star >> skipper >> astronn_dist
+        #skipper = PythonOperator(
+        #    task_id="skipper",
+        #    python_callable=skippy,
+        #)
+        astronn_star >> astronn_dist
 
-    summary_spectrum_products >> (apogeenet, aspcap, bossnet, lineforest, astronn)
 
-    apogeenet_star >> aspcap >> spectrum_products
+    #summary_spectrum_products >>
+
+    apogeenet_star >> aspcap
 
     #repo >> task_migrate
 
@@ -281,15 +289,12 @@ with DAG(
     #task_migrate >> apogeenet
     #(task_migrate, apogeenet_star) >> aspcap
     #apogeenet_star >> aspcap
-    '''
-
     star_tasks = (lineforest_star, slam_star, bossnet_star, mdwarftype_star, snow_white_star)
 
     BranchPythonOperator(
         task_id='check_first_run',
         python_callable=is_first_run,
     ) >> (begin, init)
-
 
     init >> migrate >> begin
     begin >> (
@@ -300,7 +305,10 @@ with DAG(
         lineforest,
         mdwarftype,
         snowwhite,
-        corv
+        corv,
+        apogeenet,
+        aspcap,
+        astronn
     )
     snowwhite >> corv
     summary_spectrum_products >> star_tasks
