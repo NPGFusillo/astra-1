@@ -29,11 +29,6 @@ cli
 :hidden:
 
 developer/index
-developer/structure
-developer/writing-a-pipeline
-developer/database
-developer/tests
-developer/dags
 ```
 
 
