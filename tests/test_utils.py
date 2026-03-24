@@ -355,3 +355,248 @@ def test_get_logger():
     assert log is not None
     assert isinstance(log, logging.Logger)
     assert log.name == "astra"
+
+
+def test_get_task_group_by_string_no_group_by_safe():
+    """When function source has no group_by= pattern, safe=True returns None."""
+    from astra.utils import get_task_group_by_string
+
+    def no_group_by():
+        pass
+
+    assert get_task_group_by_string(no_group_by, safe=True) is None
+
+
+def test_get_task_group_by_string_no_group_by_unsafe():
+    """When function source has no group_by= pattern, safe=False raises."""
+    from astra.utils import get_task_group_by_string
+    import pytest
+
+    def no_group_by():
+        pass
+
+    with pytest.raises(Exception):
+        get_task_group_by_string(no_group_by, safe=False)
+
+
+def test_accepts_live_renderable_uninspectable():
+    """accepts_live_renderable returns False for objects that can't be inspected."""
+    from astra.utils import accepts_live_renderable
+
+    # A non-callable object will cause inspect.signature to fail
+    assert accepts_live_renderable(42) is False
+
+
+def test_expects_spectrum_types_no_spectra_param():
+    """expects_spectrum_types raises RuntimeError when function has no 'spectra' param."""
+    from astra.utils import expects_spectrum_types
+    import pytest
+
+    def bad_func(x):
+        pass
+
+    with pytest.raises(RuntimeError, match="Could not parse expected spectrum types"):
+        expects_spectrum_types(bad_func)
+
+
+def test_expects_source_types_with_proper_annotation():
+    """expects_source_types returns source types from annotation."""
+    from astra.utils import expects_source_types
+    from typing import Iterable, Union
+
+    class SourceA:
+        pass
+
+    class SourceB:
+        pass
+
+    def my_func(sources: Iterable[Union[SourceA, SourceB]]):
+        pass
+
+    result = expects_source_types(my_func)
+    assert SourceA in result
+    assert SourceB in result
+
+
+def test_expects_source_types_single_type():
+    """expects_source_types returns a tuple with single type when no Union."""
+    from astra.utils import expects_source_types
+    from typing import Iterable
+
+    class SourceA:
+        pass
+
+    def my_func(sources: Iterable[SourceA]):
+        pass
+
+    result = expects_source_types(my_func)
+    assert result == (SourceA,)
+
+
+def test_expects_source_types_no_sources_param():
+    """expects_source_types raises RuntimeError when function has no 'sources' param."""
+    from astra.utils import expects_source_types
+    import pytest
+
+    def bad_func(x):
+        pass
+
+    with pytest.raises(RuntimeError, match="Could not parse expected spectrum types"):
+        expects_source_types(bad_func)
+
+
+def test_get_return_type_missing_annotation():
+    """get_return_type raises ValueError when no return annotation."""
+    from astra.utils import get_return_type
+    import pytest
+
+    def no_return():
+        pass
+
+    with pytest.raises(ValueError, match="Cannot infer output model"):
+        get_return_type(no_return)
+
+
+def test_resolve_model_non_string():
+    """resolve_model returns non-string input as-is."""
+    from astra.utils import resolve_model
+
+    class MyModel:
+        pass
+
+    assert resolve_model(MyModel) is MyModel
+    assert resolve_model(42) == 42
+
+
+def test_resolve_task_resolvable():
+    """resolve_task should resolve a valid task string."""
+    from astra.utils import resolve_task
+    # os.path.join is resolvable via the callable function
+    result = resolve_task("os.path.join")
+    assert result is os.path.join
+
+
+def test_timer_setattr_fails_warns():
+    """Timer warns when setattr for t_elapsed fails on an item."""
+    from astra.utils import Timer
+    import warnings
+
+    # A frozen/immutable object where setattr will fail
+    item = (1, 2, 3)  # tuple - can't set attributes
+
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        with Timer([item], attr_t_elapsed="t_elapsed") as timer:
+            for _ in timer:
+                pass
+
+    assert any("Could not store elapsed time" in str(warning.message) for warning in w)
+
+
+def test_timer_add_overheads_exception():
+    """Timer.add_overheads continues when setattr fails."""
+    from astra.utils import Timer
+
+    # Use tuples which don't support setattr
+    items = [(1,), (2,), (3,)]
+
+    with Timer(items, attr_t_elapsed="t_elapsed", attr_t_overhead="t_overhead") as timer:
+        for _ in timer:
+            pass
+
+    # add_overheads should not raise, just continue
+    result = timer.add_overheads(items)
+    assert result is None
+
+
+def test_timer_check_point_triggers():
+    """Timer.check_point returns True when enough time has passed."""
+    from astra.utils import Timer
+    from time import sleep
+
+    # Use a very short frequency so we can trigger a checkpoint
+    with Timer([1, 2], frequency=0.001) as timer:
+        for _ in timer:
+            sleep(0.01)  # Sleep long enough to trigger checkpoint
+        assert timer.check_point is True
+        assert timer._n_check_points >= 1
+
+
+def test_expects_spectrum_types_union():
+    """expects_spectrum_types returns types from Union annotation."""
+    from astra.utils import expects_spectrum_types
+    from typing import Iterable, Union
+
+    class SpecA:
+        pass
+
+    class SpecB:
+        pass
+
+    def my_func(spectra: Iterable[Union[SpecA, SpecB]]):
+        pass
+
+    result = expects_spectrum_types(my_func)
+    assert SpecA in result
+    assert SpecB in result
+
+
+def test_expects_spectrum_types_single():
+    """expects_spectrum_types returns single type in tuple when no Union."""
+    from astra.utils import expects_spectrum_types
+    from typing import Iterable
+
+    class SpecA:
+        pass
+
+    def my_func(spectra: Iterable[SpecA]):
+        pass
+
+    result = expects_spectrum_types(my_func)
+    assert result == (SpecA,)
+
+
+def test_resolve_model_with_string():
+    """resolve_model resolves a dotted string to a model class."""
+    from astra.utils import resolve_model
+    # Source is available directly in astra.models
+    result = resolve_model("Source")
+    from astra.models import Source
+    assert result is Source
+
+
+def test_resolve_task_all_prefixes_fail():
+    """resolve_task hits the else branch when all prefixed attempts fail."""
+    from astra.utils import resolve_task
+    import pytest
+
+    with pytest.raises(ImportError):
+        resolve_task("totally_nonexistent_module_xyz.func")
+
+
+def test_get_config_paths():
+    """get_config_paths returns a list of path strings."""
+    from astra.utils import get_config_paths
+    paths = get_config_paths()
+    assert isinstance(paths, list)
+    assert len(paths) > 0
+    assert all(p.endswith(".yml") for p in paths)
+
+
+def test_timer_add_overheads_success():
+    """Timer.add_overheads sets attributes on items that support it."""
+    from astra.utils import Timer
+
+    class Result:
+        t_elapsed = None
+        t_overhead = None
+
+    r1, r2 = Result(), Result()
+
+    with Timer([r1, r2], attr_t_elapsed="t_elapsed", attr_t_overhead="t_overhead") as timer:
+        for _ in timer:
+            pass
+
+    timer.add_overheads([r1, r2])
+    assert r1.t_overhead is not None
+    assert r2.t_overhead is not None
