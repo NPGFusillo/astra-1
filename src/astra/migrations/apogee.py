@@ -827,9 +827,14 @@ def migrate_apogee_visits(apred: str, max_mjd: Optional[int] = None, queue=None,
         queue.put(dict(description=f"Upserting APOGEE {apred} visit spectra", total=len(spectrum_data), completed=0))
         with database.atomic():
             for chunk in chunked(spectrum_data, batch_size):
+                _chunk = []
+                for r in chunk:
+                    r.pop("sdss_id")
+                    _chunk.append(r)
+
                 q = (
                     ApogeeVisitSpectrum
-                    .insert_many(chunk)
+                    .insert_many(_chunk)
                     .returning(ApogeeVisitSpectrum.pk)
                     .on_conflict(
                         conflict_target=[
@@ -849,6 +854,7 @@ def migrate_apogee_visits(apred: str, max_mjd: Optional[int] = None, queue=None,
                             (ApogeeVisitSpectrum.rv_visit_pk.is_null() & EXCLUDED.rv_visit_pk.is_null(False))   # New RV measurement; none before.
                         |   (ApogeeVisitSpectrum.rv_visit_pk.is_null(False) & EXCLUDED.rv_visit_pk.is_null())   # Old RV measurement was bad.
                         |   (EXCLUDED.rv_visit_pk > ApogeeVisitSpectrum.rv_visit_pk)                            # Updated RV measurement.
+                        |   (ApogeeVisitSpectrum.spectrum_flags != EXCLUDED.spectrum_flags)                       # Updated spectrum flags
                         )
                     )
                     .tuples()
