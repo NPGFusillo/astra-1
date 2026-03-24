@@ -1,5 +1,8 @@
 import json
-from airflow.sensors.base import BaseSensorOperator
+try:
+    from airflow.sdk.bases.sensor import BaseSensorOperator
+except (ImportError, ModuleNotFoundError):
+    from airflow.sensors.base import BaseSensorOperator
 
 class SlurmSensor(BaseSensorOperator):
 

@@ -168,7 +168,7 @@ def create_source_primary_hdu_cards(
     context="results"
 ):
     
-    created = datetime.datetime.utcnow().strftime(DATETIME_FMT)
+    created = datetime.datetime.now(datetime.timezone.utc).strftime(DATETIME_FMT)
 
     shortened_names = { k[0]: k[0] if len(k) == 1 else k[1] for k in field_names }
     s = lambda v: v.upper() if upper else v
@@ -554,7 +554,7 @@ def get_basic_header(
     include_hdu_descriptions=False,
     upper=False
 ):
-    created = datetime.datetime.utcnow().strftime(DATETIME_FMT)
+    created = datetime.datetime.now(datetime.timezone.utc).strftime(DATETIME_FMT)
 
     s = lambda v: v.upper() if upper else v
     cards = [
