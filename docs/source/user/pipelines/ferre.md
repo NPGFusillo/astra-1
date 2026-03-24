@@ -1,7 +1,7 @@
 # FERRE
 
-FERRE (Fitting Evolutionary and Resolved Radial-velocity Estimates) is a grid-based
-spectral fitting code that serves as the backend for the [ASPCAP](aspcap) pipeline. In
+FERRE is a grid-based spectral fitting code that serves as the backend for the
+[ASPCAP](aspcap) pipeline. In
 Astra, FERRE is used in a multi-stage process to determine stellar parameters and
 individual chemical abundances from APOGEE spectra.
 

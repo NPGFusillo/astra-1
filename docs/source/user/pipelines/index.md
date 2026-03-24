@@ -15,9 +15,9 @@ spectral classification.
 | [AstroNN Dist](astronn_dist) | AstroNN with distance estimation |
 | [Best](best) | Selects best results from multiple pipelines per source |
 | [BOSSNet](bossnet) | Neural network stellar parameters for BOSS spectra |
-| [CLAM](clam) | Spectral fitting using grid interpolation |
+| [CLAM](clam) | Constrained Linear Absorption Model for fitting stellar spectra |
 | [Corv](corv) | Radial velocity and parameters for DA white dwarfs |
-| [FERRE](ferre) | FERRE grid-based fitting backend (used by ASPCAP) |
+| [FERRE](ferre) | Grid-based spectral fitting backend (used by ASPCAP) |
 | [Grok](grok) | Stellar parameters and vsini from high-resolution grid fitting |
 | [Line Forest](line_forest) | Spectral line strength measurements |
 | [MDwarfType](mdwarftype) | M dwarf spectral classification via template matching |

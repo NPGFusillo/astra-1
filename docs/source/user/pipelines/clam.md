@@ -1,7 +1,7 @@
 # CLAM
 
-CLAM (Continuum and Labels from Analytic Marginalization) fits stellar parameters from
-APOGEE spectra using grid interpolation combined with a sinusoidal continuum model. It
+CLAM (Constrained Linear Absorption Model) fits stellar spectra from
+APOGEE using grid interpolation combined with a sinusoidal continuum model. It
 operates in log-flux space and uses NMF-based spectral decomposition.
 
 ## What it does
