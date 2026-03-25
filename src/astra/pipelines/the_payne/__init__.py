@@ -32,6 +32,7 @@ def the_payne(
     page=None,
     limit=None,
     debug=False,
+    **kwargs,
 ) -> Iterable[ThePayne]:
 
     if isinstance(spectra, ModelSelect):

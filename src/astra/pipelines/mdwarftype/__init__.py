@@ -17,7 +17,8 @@ def mdwarftype(
     spectra: Iterable[Union[BossVisitSpectrum, BossCombinedSpectrum]],
     template_list: str = "$MWM_ASTRA/pipelines/MDwarfType/template.list",
     max_workers: int = 4,
-    batch_size: int = 10_000
+    batch_size: int = 10_000,
+    **kwargs
 ) -> Iterable[MDwarfType]:
     """
     Classify a single M dwarf from spectral templates.
