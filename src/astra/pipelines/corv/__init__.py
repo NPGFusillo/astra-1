@@ -51,7 +51,7 @@ def corv(
             yield Corv.from_spectrum(spectrum, flag_no_wd_classification=True)
             continue
 
-        if not classification.startswith("DA"):
+        if classification is None or (not classification.startswith("DA")):
             yield Corv.from_spectrum(spectrum, flag_not_da_type=True)
             continue
 
