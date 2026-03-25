@@ -19,7 +19,7 @@ from peewee import fn, Value
 # Q: Unique results by SOURCE, or by SOURCE + TELECOPE?
 
 @task
-def best(apred=("dr17", "1.3"), run2d="v6_1_3") -> Iterable[MWMBest]:
+def best(apred=("dr17", "1.3"), run2d="v6_1_3", **kwargs) -> Iterable[MWMBest]:
 
     if isinstance(apred, str):
         apred = [apred]

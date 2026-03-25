@@ -21,7 +21,8 @@ def measure_vsini(
         .where(GrokRotation.spectrum_pk.is_null())
         .order_by(ApogeeCombinedSpectrum.spectrum_pk)
     ),    
-    limit=None
+    limit=None,
+    **kwargs
 ) -> Iterable[GrokRotation]:
     
     from juliacall import Main as jl

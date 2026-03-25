@@ -29,7 +29,8 @@ def rectify_boss_spectra_by_source(
         )
     ),
     page: Optional[int] = None,
-    limit: Optional[int] = None        
+    limit: Optional[int] = None,
+    **kwargs
 ) -> Iterable[NMFRectify]:
 
     # TODO: Should consider this logic to be executed somewhere else, either in the astra CLI call, or in the task wrapper, etc
@@ -64,9 +65,10 @@ def rectify_apogee_coadded_spectra_in_apstar(
         .where(NMFRectify.spectrum_pk.is_null())
     ),
     page: Optional[int] = None,
-    limit: Optional[int] = None    
+    limit: Optional[int] = None,
+    **kwargs
 ) -> Iterable[NMFRectify]:
-    
+
     # TODO: Should consider this logic to be executed somewhere else, either in the astra CLI call, or in the task wrapper, etc
     if isinstance(spectra, ModelSelect):
         if page is not None and limit is not None:

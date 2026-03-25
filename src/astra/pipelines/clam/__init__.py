@@ -287,7 +287,8 @@ def clam(
         (15120.0, 15820.0),
         (15840.0, 16440.0),
         (16450.0, 16960.0),
-    )
+    ),
+    **kwargs
 ) -> Iterable[Clam]:
 
     if isinstance(spectra, ModelSelect) and limit is not None:

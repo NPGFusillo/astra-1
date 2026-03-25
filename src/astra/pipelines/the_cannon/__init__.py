@@ -36,8 +36,9 @@ def the_apogee_cannon_coadd(
     model_path: Optional[str] = "$MWM_ASTRA/pipelines/TheCannon/20231106-beta.model", 
     page=None,
     limit=None,
+    **kwargs
 ) -> Iterable[TheCannon]:
-    
+
     total = None
     if isinstance(spectra, ModelSelect):
         if page is not None and limit is not None:
@@ -118,8 +119,8 @@ def the_apogee_coadd_cannon(
             NMFRectify.continuum_theta
         )
         .join(
-            TheCannon, 
-            JOIN.LEFT_OUTER, 
+            TheCannon,
+            JOIN.LEFT_OUTER,
             on=(
                 (TheCannon.spectrum_pk == ApogeeCoaddedSpectrumInApStar.spectrum_pk)
             &   (TheCannon.v_astra == __version__)
@@ -137,9 +138,10 @@ def the_apogee_coadd_cannon(
     model_path: Optional[str] = "$MWM_ASTRA/pipelines/TheCannon/20231106-beta.model", 
     page=None,
     limit=None,
+    **kwargs
 ) -> Iterable[TheCannon]:
     """
-    Run inference (the test step) on some spectra with The Cannon.    
+    Run inference (the test step) on some spectra with The Cannon.
     """
 
     yield from _the_cannon(spectra, model_path, page, limit, ApogeeNMFContinuum())
@@ -175,9 +177,10 @@ def the_apogee_visit_cannon(
     model_path: Optional[str] = "$MWM_ASTRA/pipelines/TheCannon/20231106-beta.model", 
     page=None,
     limit=None,
+    **kwargs
 ) -> Iterable[TheCannon]:
     """
-    Run inference (the test step) on some spectra with The Cannon.    
+    Run inference (the test step) on some spectra with The Cannon.
     """
 
     yield from _the_cannon(spectra, model_path, page, limit, ApogeeNMFContinuum())
