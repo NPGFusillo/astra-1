@@ -174,7 +174,7 @@ def create_mwm_targets_product(
     &   ((Source.n_apogee_visits > 0) | (Source.n_boss_visits > 0))
     ),
     limit=None,
-    output_template="mwmTargets-{version_major_minor}.fits",
+    output_template="mwmTargets-{version}.fits",
     ignore_field_name_callable=ignore_field_name_callable,
     upper=False,
     fill_values=None,
@@ -185,13 +185,13 @@ def create_mwm_targets_product(
     """
     Create an `mwmTargets` product containing a single HDU with source-level information about all targets,
     excluding any data reduction information (NOT including data reduction results).
-    
+
     :param where: [optional]
         A `where` clause for the `Source.select()` query.
-    
+
     :param limit: [optional]
         Specify an optional limit on the number of rows.
-        
+
     :param output_template: [optional]
         The output basename template to use for this product.
 
@@ -204,29 +204,29 @@ def create_mwm_targets_product(
             `name_conflict_strategy(fields, name, field, model)`
 
         where:
-    
+
         - `fields` is a dictionary with field names as keys and fields as values,
         - `name` is the conflicting field name (e.g., it appears already in `fields`),
         - `field` is the conflicting field,
         - `model` is the model where the conflicting `field` is bound to.
-    
+
         This callable should update `fields` (or not).
-    
+
     :param upper: [optional]
         Specify all field names to be in upper case.
-    
+
     :param fill_values: [optional]
         Specify a fill value for each kind of column type.
-    
+
     :param overwrite: [optional]
         Overwrite the path if it already exists.
-        
+
     :param gzip: [optional]
         Gzip the file.
-    
+
     :param full_output: [optional]
         If `True`, return a two-length tuple containing the path and the HDU list,
-        otherwise just return the path.      
+        otherwise just return the path.
     """
     path = get_path(output_template.format(
         version=__version__,
@@ -239,7 +239,7 @@ def create_mwm_targets_product(
         name_conflict_strategy=None,
         ignore_field_name_callable=ignore_field_name_callable
     )
-    
+
     q = (
         Source
         .select(*tuple(fields.values()))
@@ -251,7 +251,7 @@ def create_mwm_targets_product(
         .limit(limit)
         .dicts()
     )
-    
+
     hdus = [
         fits.PrimaryHDU(header=get_basic_header()),
         get_binary_table_hdu(
@@ -270,8 +270,8 @@ def create_mwm_targets_product(
     if gzip:
         os.system(f"gzip -f {path}")
         path += ".gz"
-    os.system(f"chmod 755 {path}")        
-    return (path, hdu_list) if full_output else path    
+    os.system(f"chmod 755 {path}")
+    return (path, hdu_list) if full_output else path
 
 
 def create_mwm_all_star_product(
@@ -284,7 +284,7 @@ def create_mwm_all_star_product(
     apogee_where=None,
     boss_spectrum_model=BossCombinedSpectrum,
     apogee_spectrum_model=ApogeeCoaddedSpectrumInApStar,
-    output_template="mwmAllStar-{version_major_minor}.fits",
+    output_template="mwmAllStar-{version}.fits",
     ignore_field_name_callable=ignore_field_name_callable,
     name_conflict_strategy=None,
     upper=False,
@@ -298,22 +298,22 @@ def create_mwm_all_star_product(
 
     :param where: [optional]
         A `where` clause for the `Source.select()` query.
-    
+
     :param limit: [optional]
         Specify an optional limit on the number of rows.
-    
+
     :param boss_where: [optional]
         A `where` clause for the `boss_spectrum_model` query.
-    
+
     :param apogee_where: [optional]
         A `where` clause for the `apogee_spectrum_model` query.
 
     :param boss_spectrum_model: [optional]
         The BOSS spectrum model to use when constructing this query.
-    
+
     :param apogee_spectrum_model: [optional]
         The APOGEE spectrum model to use when constructing this query.
-        
+
     :param output_template: [optional]
         The output basename template to use for this product.
 
@@ -326,26 +326,26 @@ def create_mwm_all_star_product(
             `name_conflict_strategy(fields, name, field, model)`
 
         where:
-    
+
         - `fields` is a dictionary with field names as keys and fields as values,
         - `name` is the conflicting field name (e.g., it appears already in `fields`),
         - `field` is the conflicting field,
         - `model` is the model where the conflicting `field` is bound to.
-    
+
         This callable should update `fields` (or not).
-    
+
     :param upper: [optional]
         Specify all field names to be in upper case.
-    
+
     :param fill_values: [optional]
         Specify a fill value for each kind of column type.
-    
+
     :param overwrite: [optional]
         Overwrite the path if it already exists.
-    
+
     :param full_output: [optional]
         If `True`, return a two-length tuple containing the path and the HDU list,
-        otherwise just return the path.        
+        otherwise just return the path.
     """
     path = get_path(output_template.format(
         version=__version__,
@@ -380,7 +380,7 @@ def create_mwm_all_visit_product(
     apogee_where=None,
     boss_spectrum_model=BossVisitSpectrum,
     apogee_spectrum_model=ApogeeVisitSpectrum,
-    output_template="mwmAllVisit-{version_major_minor}.fits",
+    output_template="mwmAllVisit-{version}.fits",
     ignore_field_name_callable=ignore_field_name_callable,
     name_conflict_strategy=None,
     upper=False,
@@ -391,22 +391,22 @@ def create_mwm_all_visit_product(
 ):
     """
     Create an `mwmAllVisit` product containing all the visit information about all sources (NOT including pipeline results).
-    
+
     :param where: [optional]
         A `where` clause for the database query.
-    
+
     :param limit: [optional]
         Specify an optional limit on the number of rows per HDU.
-    
+
     :param boss_where: [optional]
         A `where` clause for the `boss_spectrum_model` query.
-    
+
     :param apogee_where: [optional]
         A `where` clause for the `apogee_spectrum_model` query.
 
     :param boss_spectrum_model: [optional]
         The BOSS spectrum model to use when constructing this query.
-    
+
     :param apogee_spectrum_model: [optional]
         The APOGEE spectrum model to use when constructing this query.
 
@@ -422,26 +422,26 @@ def create_mwm_all_visit_product(
             `name_conflict_strategy(fields, name, field, model)`
 
         where:
-    
+
         - `fields` is a dictionary with field names as keys and fields as values,
         - `name` is the conflicting field name (e.g., it appears already in `fields`),
         - `field` is the conflicting field,
         - `model` is the model where the conflicting `field` is bound to.
-    
+
         This callable should update `fields` (or not).
-    
+
     :param upper: [optional]
         Specify all field names to be in upper case.
-    
+
     :param fill_values: [optional]
         Specify a fill value for each kind of column type.
-    
+
     :param overwrite: [optional]
         Overwrite the path if it already exists.
-    
+
     :param full_output: [optional]
         If `True`, return a two-length tuple containing the path and the HDU list,
-        otherwise just return the path.        
+        otherwise just return the path.
     """
     path = get_path(output_template.format(
         version=__version__,
@@ -478,8 +478,8 @@ def _create_summary_product(
     fill_values=None,
     gzip=True,
     overwrite=False,
-    full_output=False,        
-):    
+    full_output=False,
+):
     check_path(path, overwrite, gzip)
 
     kwds = dict(upper=upper, fill_values=fill_values, limit=limit)
@@ -496,12 +496,12 @@ def _create_summary_product(
         (boss_spectrum_model, boss_where),
         (apogee_spectrum_model, apogee_where)
     ]
-    
+
     all_fields = {}
     for model, hdu_where in struct:
 
         instrument = "BOSS" if "boss" in model.__name__.lower() else "APOGEE"
-        
+
         models = (Source, model)
         try:
             fields = all_fields[model]
@@ -513,7 +513,7 @@ def _create_summary_product(
             )
 
         header = get_basic_header(
-            #observatory=observatory, 
+            #observatory=observatory,
             instrument=instrument
         )
 
@@ -522,14 +522,14 @@ def _create_summary_product(
             .select(*tuple(fields.values()))
             .join(Source, JOIN.LEFT_OUTER, on=(Source.pk == model.source_pk))
             #.where(model.telescope.startswith(observatory))
-        )        
+        )
 
         if hdu_where is not None:
             q = q.where(hdu_where)
 
         if where: # Need to check, otherwise it requires AND with previous where.
             q = q.where(where)
-        
+
         q = q.limit(limit).dicts()
 
         hdu = get_binary_table_hdu(
@@ -545,6 +545,6 @@ def _create_summary_product(
     hdu_list.writeto(path, overwrite=overwrite)
     if gzip:
         os.system(f"gzip -f {path}")
-        path += ".gz"    
-    os.system(f"chmod 755 {path}")        
+        path += ".gz"
+    os.system(f"chmod 755 {path}")
     return (path, hdu_list) if full_output else path

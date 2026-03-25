@@ -226,14 +226,15 @@ def prepare_apogee_resampled_visit_and_coadd_spectra_from_apstar(source, observa
     coadd_spectrum.save()
     if visit_spectra:
         # Remove any existing entries before we create this one.
+        releases = tuple(set([s.release for s in visit_spectra]))
         (
             ApogeeRestFrameVisitSpectrum
             .delete()
             .where(
                 (ApogeeRestFrameVisitSpectrum.sdss_id == source.sdss_id)
             &   (ApogeeRestFrameVisitSpectrum.telescope == visit_spectra[0].telescope)
-            &   (ApogeeRestFrameVisitSpectrum.apred == visit_spectra[0].apred)
-            &   (ApogeeRestFrameVisitSpectrum.release == visit_spectra[0].release)
+            &   (ApogeeRestFrameVisitSpectrum.apred.in_(apreds))
+            &   (ApogeeRestFrameVisitSpectrum.release.in_(releases))
             &   (ApogeeRestFrameVisitSpectrum.v_astra == visit_spectra[0].v_astra)
             )
             .execute()
