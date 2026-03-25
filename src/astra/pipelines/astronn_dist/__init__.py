@@ -41,7 +41,7 @@ def astronn_dist(
 
 
 
-def test_astronn():
+def test_astronn(limit=100):
     import os
     import numpy as np
     from astropy.io import fits
@@ -55,6 +55,8 @@ def test_astronn():
     mask_good = np.logical_and(mask_good, data_astronn['dist'] < 8e3)
     data_good = data_astronn[mask_good]
     print(len(data_good))
+    from astra.models.source import Source
+    from astra.models.apogee import ApogeeCoaddedSpectrumInApStar
 
     q = (
         ApogeeCoaddedSpectrumInApStar
@@ -64,11 +66,11 @@ def test_astronn():
         .where(
             Source.sdss4_apogee_id.in_(list(data_good['apogee_id']))
         )
-        .limit(1000)
+        .limit(limit)
     )
 
     results = list(astronn_dist(q))
-    results_serial = list(astronn_dist(list(q)[:10], parallel=False))
+    results_serial = list(astronn_dist(list(q)[:limit], parallel=False,))
 
     import matplotlib.pyplot as plt
     sdss4_apogee_ids = [Source.get(s.source_pk).sdss4_apogee_id for s in results_serial]
@@ -80,3 +82,5 @@ def test_astronn():
 
     fig, ax = plt.subplots()
     ax.scatter(x, y_serial)
+    fig.savefig("tmp.png", dpi=300)
+    raise a

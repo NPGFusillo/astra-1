@@ -137,11 +137,17 @@ def validate_summary(
     from astropy.table import Table
     from astropy.io import fits
 
-    handlers = [logging.StreamHandler()]
-    if log_file is not None:
-        handlers.append(logging.FileHandler(str(log_file)))
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s - %(message)s", handlers=handlers)
     logger = logging.getLogger("astra.validate.summary")
+    logger.setLevel(logging.INFO)
+    logger.propagate = False
+    formatter = logging.Formatter("%(levelname)s - %(message)s")
+    sh = logging.StreamHandler()
+    sh.setFormatter(formatter)
+    logger.addHandler(sh)
+    if log_file is not None:
+        fh = logging.FileHandler(str(log_file))
+        fh.setFormatter(formatter)
+        logger.addHandler(fh)
 
     all_results = {}
     for file_path in paths:
@@ -225,6 +231,7 @@ class Product(str, Enum):
     astraAllVisitCorv = "astraAllVisitCorv"
 
     astraAllStarSnowWhite = "astraAllStarSnowWhite"
+    astraAllStarThePayne = "astraAllStarThePayne"
 
 
 
@@ -387,6 +394,14 @@ def create(
                 {
                     "pipeline_model": "snow_white.SnowWhite",
                     "boss_spectrum_model": BossCombinedSpectrum,
+                    "overwrite": overwrite
+                }
+            ),
+            Product.astraAllStarThePayne: (
+                create_all_star_product,
+                {
+                    "pipeline_model": "the_payne.ThePayne",
+                    "apogee_spectrum_model": ApogeeCoaddedSpectrumInApStar,
                     "overwrite": overwrite
                 }
             )
@@ -1150,7 +1165,8 @@ def init(
         "snow_white",
         "corv",
         "slam",
-        "mdwarftype"
+        "mdwarftype",
+        "the_payne"
     )
     for package in init_model_packages:
         import_module(f"astra.models.{package}")

@@ -11,14 +11,15 @@ from astra.utils import log, executable, expand_path
 from astra.pipelines.the_payne.model import estimate_labels
 from astra.pipelines.the_payne.utils import read_mask, read_model
 
+from astra.models.apogee import ApogeeCoaddedSpectrumInApStar, ApogeeVisitSpectrumInApStar
 from astra.models.the_payne import ThePayne
 from peewee import ModelSelect
 
 @task
 def the_payne(
-    spectra,
-    model_path: str = "$MWM_ASTRA/pipelines/ThePayne/payne_apogee_nn.pkl", 
-    mask_path: str = "$MWM_ASTRA/pipelines/ThePayne/payne_apogee_mask.npy", 
+    spectra: Iterable[Union[ApogeeCoaddedSpectrumInApStar, ApogeeVisitSpectrumInApStar]],
+    model_path: str = "$MWM_ASTRA/pipelines/ThePayne/payne_apogee_nn.pkl",
+    mask_path: str = "$MWM_ASTRA/pipelines/ThePayne/payne_apogee_mask.npy",
     opt_tolerance: Optional[float] = 5e-4,
     v_rad_tolerance: Optional[float] = 0,
     initial_labels: Optional[float] = None,
@@ -37,11 +38,11 @@ def the_payne(
         if page is not None and limit is not None:
             spectra = spectra.paginate(page, limit)
         elif limit is not None:
-            spectra = spectra.limit(limit)        
+            spectra = spectra.limit(limit)
 
     model = read_model(model_path)
     mask = read_mask(mask_path)
-    
+
     args = [
         model[k]
         for k in (
@@ -60,7 +61,7 @@ def the_payne(
                 f_continuum = executable(continuum_method)(**continuum_kwargs)
                 continuum = np.atleast_2d(f_continuum.fit(spectrum))
             else:
-                continuum = None            
+                continuum = None
 
             # With SpectrumList, we should only ever have 1 spectrum
             (result, ), (meta, ) = estimate_labels(
@@ -85,7 +86,7 @@ def the_payne(
                 pickle.dump((meta["continuum"], meta["rectified_model_flux"]), fp)
 
             yield output
-        
+
         except:
             log.exception(f"Exception when fitting spectrum {spectrum}")
             if debug:

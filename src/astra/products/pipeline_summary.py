@@ -17,14 +17,14 @@ get_path = lambda bn, gzip: expand_path(f"$MWM_ASTRA/{__version__}/summary/{bn}"
 
 def ignore_field_name_callable(field_name):
     return (
-        (field_name.lower() in ("pk", "input_spectrum_pks")) 
+        (field_name.lower() in ("pk", "input_spectrum_pks"))
     or  field_name.lower().startswith("rho_")
     )
 
 def create_astra_best_product(
     where=None,
     limit=None,
-    output_template="astraFrankenstein-{version_major_minor}.fits",
+    output_template="astraFrankenstein-{version}.fits",
     ignore_field_name_callable=ignore_field_name_callable,
     name_conflict_strategy=None,
     distinct_spectrum_pk=True,
@@ -39,10 +39,10 @@ def create_astra_best_product(
 
     :param where: [optional]
         A `where` clause for the `Source.select()` query.
-    
+
     :param limit: [optional]
         Specify an optional limit on the number of rows.
-    
+
     :param ignore_field_name_callable: [optional]
         A callable that returns `True` if a field name should be ignored.
 
@@ -52,48 +52,48 @@ def create_astra_best_product(
             `name_conflict_strategy(fields, name, field, model)`
 
         where:
-    
+
         - `fields` is a dictionary with field names as keys and fields as values,
         - `name` is the conflicting field name (e.g., it appears already in `fields`),
         - `field` is the conflicting field,
         - `model` is the model where the conflicting `field` is bound to.
-    
+
         This callable should update `fields` (or not).
-    
+
     :param upper: [optional]
         Specify all field names to be in upper case.
-    
+
     :param fill_values: [optional]
         Specify a fill value for each kind of column type.
-    
+
     :param overwrite: [optional]
         Overwrite the path if it already exists.
-    
+
     :param full_output: [optional]
         If `True`, return a two-length tuple containing the path and the HDU list,
-        otherwise just return the path.        
+        otherwise just return the path.
     """
-        
+
     from astra.models.best import MWMBest as pipeline_model
 
     path = get_path(
         output_template.format(
             version=__version__,
             version_major_minor=".".join(__version__.split(".")[:2])
-        ), 
+        ),
         gzip
     )
     check_path(path, overwrite)
-    
+
     kwds = dict(
-        upper=upper, 
-        fill_values=fill_values, 
+        upper=upper,
+        fill_values=fill_values,
         limit=limit,
     )
     hdus = [
         fits.PrimaryHDU(header=get_basic_header())
     ]
-        
+
     og_fields = get_fields(
         (Source, pipeline_model),
         name_conflict_strategy=name_conflict_strategy,
@@ -108,10 +108,10 @@ def create_astra_best_product(
             if hasattr(pipeline_model, "flag_warn"):
                 fields["flag_warn"] = BooleanField(default=False, help_text="Warning flag for results")
             if hasattr(pipeline_model, "flag_bad"):
-                fields["flag_bad"] = BooleanField(default=False, help_text="Bad flag for results")        
+                fields["flag_bad"] = BooleanField(default=False, help_text="Bad flag for results")
 
     header = get_basic_header()
-    
+
     select_fields = []
     for n, f in fields.items():
         if n in ("flag_warn", "flag_bad"):
@@ -126,13 +126,13 @@ def create_astra_best_product(
         .select(*select_fields)
         .join(Source)
         .where(pipeline_model.v_astra_major_minor == current_version)
-    )   
+    )
 
     if where: # Need to check, otherwise it requires AND with previous where.
         q = q.where(where)
-    
+
     q = q.limit(limit).dicts()
-    
+
     hdu = get_binary_table_hdu(
         q,
         header=header,
@@ -147,8 +147,8 @@ def create_astra_best_product(
     if gzip:
         os.system(f"gzip -f {path}")
         path += ".gz"
-    
-    return (path, hdu_list) if full_output else path    
+
+    return (path, hdu_list) if full_output else path
 
 
 def create_all_star_product(
@@ -159,7 +159,7 @@ def create_all_star_product(
     apogee_where=None,
     boss_spectrum_model=BossCombinedSpectrum,
     apogee_spectrum_model=ApogeeCoaddedSpectrumInApStar,
-    output_template="astraAllStar{pipeline}-{version_major_minor}.fits",
+    output_template="astraAllStar{pipeline}-{version}.fits",
     ignore_field_name_callable=ignore_field_name_callable,
     name_conflict_strategy=None,
     distinct_spectrum_pk=True,
@@ -178,16 +178,16 @@ def create_all_star_product(
 
     :param boss_spectrum_model:
         The BOSS star-level (coadded) spectrum database model.
-    
+
     :param apogee_spectrum_model:
         The APOGEE star-level (coadded) spectrum database model.
-    
+
     :param where: [optional]
         A `where` clause for the `Source.select()` query.
-    
+
     :param limit: [optional]
         Specify an optional limit on the number of rows.
-    
+
     :param ignore_field_name_callable: [optional]
         A callable that returns `True` if a field name should be ignored.
 
@@ -197,37 +197,37 @@ def create_all_star_product(
             `name_conflict_strategy(fields, name, field, model)`
 
         where:
-    
+
         - `fields` is a dictionary with field names as keys and fields as values,
         - `name` is the conflicting field name (e.g., it appears already in `fields`),
         - `field` is the conflicting field,
         - `model` is the model where the conflicting `field` is bound to.
-    
+
         This callable should update `fields` (or not).
-    
+
     :param upper: [optional]
         Specify all field names to be in upper case.
-    
+
     :param fill_values: [optional]
         Specify a fill value for each kind of column type.
-    
+
     :param overwrite: [optional]
         Overwrite the path if it already exists.
-    
+
     :param full_output: [optional]
         If `True`, return a two-length tuple containing the path and the HDU list,
-        otherwise just return the path.        
+        otherwise just return the path.
     """
-        
+
     pipeline_model = resolve_model(pipeline_model)
     pipeline = pipeline_model.__name__
 
     path = get_path(
         output_template.format(
-            pipeline=pipeline, 
+            pipeline=pipeline,
             version=__version__,
             version_major_minor=".".join(__version__.split(".")[:2])
-        ), 
+        ),
         gzip
     )
     check_path(path, overwrite)
@@ -235,18 +235,18 @@ def create_all_star_product(
     pipeline_model = resolve_model(pipeline_model)
     boss_spectrum_model = resolve_model(boss_spectrum_model)
     apogee_spectrum_model = resolve_model(apogee_spectrum_model)
-    
+
     pipeline = pipeline_model.__name__
 
     kwds = dict(
-        upper=upper, 
-        fill_values=fill_values, 
+        upper=upper,
+        fill_values=fill_values,
         limit=limit,
     )
     hdus = [
         fits.PrimaryHDU(header=get_basic_header(pipeline=pipeline, include_hdu_descriptions=True))
     ]
-    
+
     struct = [
     #    (boss_spectrum_model, "apo", "boss", boss_where),
     #    (boss_spectrum_model, "lco", "boss", boss_where),
@@ -255,7 +255,7 @@ def create_all_star_product(
         (boss_spectrum_model, "boss", boss_where),
         (apogee_spectrum_model, "apogee", apogee_where)
     ]
-    
+
     all_fields = {}
     for spectrum_model, instrument, instrument_where in struct:
 
@@ -278,22 +278,22 @@ def create_all_star_product(
                         fields["flag_warn"] = BooleanField(default=False, help_text="Warning flag for results")
                     if hasattr(pipeline_model, "flag_bad"):
                         fields["flag_bad"] = BooleanField(default=False, help_text="Bad flag for results")
-                
-            all_fields[spectrum_model] = fields            
+
+            all_fields[spectrum_model] = fields
 
         header = get_basic_header(
-            pipeline=pipeline, 
-        #    observatory=observatory, 
+            pipeline=pipeline,
+        #    observatory=observatory,
             instrument=instrument
         )
-        
+
         select_fields = []
         for n, f in fields.items():
             if n in ("flag_warn", "flag_bad"):
                 select_fields.append(getattr(pipeline_model, n).alias(n))
             else:
                 select_fields.append(f)
-                
+
         q = (
             spectrum_model
             .select(*select_fields)
@@ -314,7 +314,7 @@ def create_all_star_product(
             q = q.where(where)
         if instrument_where:
             q = q.where(instrument_where)
-        
+
         q = q.limit(limit).dicts()
 
         hdu = get_binary_table_hdu(
@@ -328,7 +328,7 @@ def create_all_star_product(
 
     written_path = get_path(
         output_template.format(
-            pipeline=pipeline, 
+            pipeline=pipeline,
             version=__version__,
             version_major_minor=".".join(__version__.split(".")[:2])
         ),
@@ -339,9 +339,9 @@ def create_all_star_product(
     if gzip:
         os.system(f"gzip -f {written_path}")
         written_path += ".gz"
-    
+
     os.system(f"chmod 755 {written_path}")
-    return (written_path, hdu_list) if full_output else written_path    
+    return (written_path, hdu_list) if full_output else written_path
 
 
 def create_all_visit_product(
@@ -352,7 +352,7 @@ def create_all_visit_product(
     apogee_where=None,
     boss_spectrum_model=BossVisitSpectrum,
     apogee_spectrum_model=ApogeeVisitSpectrumInApStar,
-    output_template="astraAllVisit{pipeline}-{version_major_minor}.fits",    
+    output_template="astraAllVisit{pipeline}-{version}.fits",
     ignore_field_name_callable=ignore_field_name_callable,
     name_conflict_strategy=None,
     distinct_spectrum_pk=True,
@@ -371,16 +371,16 @@ def create_all_visit_product(
 
     :param boss_spectrum_model:
         The BOSS star-level (coadded) spectrum database model.
-    
+
     :param apogee_spectrum_model:
         The APOGEE star-level (coadded) spectrum database model.
-    
+
     :param where: [optional]
         A `where` clause for the `Source.select()` query.
-    
+
     :param limit: [optional]
         Specify an optional limit on the number of rows.
-    
+
     :param ignore_field_name_callable: [optional]
         A callable that returns `True` if a field name should be ignored.
 
@@ -390,32 +390,32 @@ def create_all_visit_product(
             `name_conflict_strategy(fields, name, field, model)`
 
         where:
-    
+
         - `fields` is a dictionary with field names as keys and fields as values,
         - `name` is the conflicting field name (e.g., it appears already in `fields`),
         - `field` is the conflicting field,
         - `model` is the model where the conflicting `field` is bound to.
-    
+
         This callable should update `fields` (or not).
-    
+
     :param upper: [optional]
         Specify all field names to be in upper case.
-    
+
     :param fill_values: [optional]
         Specify a fill value for each kind of column type.
-    
+
     :param overwrite: [optional]
         Overwrite the path if it already exists.
-    
+
     :param full_output: [optional]
         If `True`, return a two-length tuple containing the path and the HDU list,
-        otherwise just return the path.        
+        otherwise just return the path.
     """
-        
+
     if boss_spectrum_model is None:
         log.warning("Defaulting boss_spectrum_model in astra.products.pipeline_summary.create_all_star_pipeline_product")
         boss_spectrum_model = BossVisitSpectrum
-    
+
     if apogee_spectrum_model is None:
         log.warning(f"Defaulting apogee_spectrum_model in astra.products.pipeline_summary.create_all_star_pipeline_product")
         apogee_spectrum_model = ApogeeVisitSpectrumInApStar
@@ -425,10 +425,10 @@ def create_all_visit_product(
 
     path = get_path(
         output_template.format(
-            pipeline=pipeline, 
+            pipeline=pipeline,
             version=__version__,
             version_major_minor=".".join(__version__.split(".")[:2])
-        ), 
+        ),
         gzip
     )
     check_path(path, overwrite)
@@ -436,12 +436,12 @@ def create_all_visit_product(
     pipeline_model = resolve_model(pipeline_model)
     boss_spectrum_model = resolve_model(boss_spectrum_model)
     apogee_spectrum_model = resolve_model(apogee_spectrum_model)
-    
+
     pipeline = pipeline_model.__name__
 
     kwds = dict(
-        upper=upper, 
-        fill_values=fill_values, 
+        upper=upper,
+        fill_values=fill_values,
         limit=limit,
     )
     hdus = [
@@ -452,7 +452,7 @@ def create_all_visit_product(
         boss_spectrum_model: BossVisitSpectrum,
         apogee_spectrum_model: ApogeeVisitSpectrum
     }
-    
+
     struct = [
     #    (boss_spectrum_model, "apo", "boss", boss_where),
     #    (boss_spectrum_model, "lco", "boss", boss_where),
@@ -461,17 +461,17 @@ def create_all_visit_product(
         (boss_spectrum_model, "boss", boss_where),
         (apogee_spectrum_model, "apogee", apogee_where)
     ]
-    
+
     all_fields = {}
     for spectrum_model, instrument, instrument_where in struct:
 
         drp_spectrum_model = drp_spectrum_models[spectrum_model]
-        
+
         models = [Source]
         if drp_spectrum_model != spectrum_model:
             models.append(drp_spectrum_model)
         models.extend([spectrum_model, pipeline_model])
-        
+
         try:
             fields = all_fields[spectrum_model]
         except KeyError:
@@ -480,7 +480,7 @@ def create_all_visit_product(
                 name_conflict_strategy=name_conflict_strategy,
                 ignore_field_name_callable=ignore_field_name_callable
             )
-                    
+
             # Try and insert fields for `flag_warn` and `flag_bad`.
             fields = OrderedDict([])
             for k, v in og_fields.items():
@@ -490,12 +490,12 @@ def create_all_visit_product(
                         fields["flag_warn"] = BooleanField(default=False, help_text="Warning flag for results")
                     if hasattr(pipeline_model, "flag_bad"):
                         fields["flag_bad"] = BooleanField(default=False, help_text="Bad flag for results")
-                                
+
             all_fields[spectrum_model] = fields
-            
+
         header = get_basic_header(
-            pipeline=pipeline, 
-            #observatory=observatory, 
+            pipeline=pipeline,
+            #observatory=observatory,
             instrument=instrument
         )
 
@@ -512,9 +512,9 @@ def create_all_visit_product(
         )
         if distinct_spectrum_pk:
             q = q.distinct(spectrum_model.spectrum_pk)
-        
+
         if drp_spectrum_model != spectrum_model:
-            # LEFT OUTER join 
+            # LEFT OUTER join
             q = (
                 q
                 .join(drp_spectrum_model, JOIN.LEFT_OUTER, on=(spectrum_model.drp_spectrum_pk == drp_spectrum_model.spectrum_pk))
@@ -522,7 +522,7 @@ def create_all_visit_product(
             )
 
         current_version = version_string_to_integer(__version__) // 1000
-            
+
         q = (
             q
             .join(pipeline_model, on=(pipeline_model.spectrum_pk == spectrum_model.spectrum_pk))
@@ -533,12 +533,12 @@ def create_all_visit_product(
         )
         if where: # Need to check, otherwise it requires AND with previous where.
             q = q.where(where)
-        
+
         if instrument_where:
             q = q.where(instrument_where)
-        
+
         q = q.limit(limit).dicts()
-        
+
         hdu = get_binary_table_hdu(
             q,
             header=header,
@@ -550,7 +550,7 @@ def create_all_visit_product(
 
     written_path = get_path(
         output_template.format(
-            pipeline=pipeline, 
+            pipeline=pipeline,
             version=__version__,
             version_major_minor=".".join(__version__.split(".")[:2])
         ),
@@ -561,6 +561,6 @@ def create_all_visit_product(
     if gzip:
         os.system(f"gzip -f {written_path}")
         written_path += ".gz"
-        
+
     os.system(f"chmod 755 {written_path}")
-    return (written_path, hdu_list) if full_output else written_path    
+    return (written_path, hdu_list) if full_output else written_path

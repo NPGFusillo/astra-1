@@ -233,7 +233,19 @@ with DAG(
         )
 
 
-    # MDwarfType, Corv, ThePayne,
+    with TaskGroup(group_id="ThePayne") as the_payne:
+        the_payne_star = (
+            BashOperator(
+                task_id="star",
+                bash_command='astra srun the_payne apogee.ApogeeCoaddedSpectrumInApStar --nodes 1 --mem 0 --time="48:00:00"'
+            )
+        )
+        the_payne_star >> (
+            BashOperator(
+                task_id="create_all_star_product",
+                bash_command="astra create astraAllStarThePayne --overwrite"
+            )
+        )
 
     with TaskGroup(group_id="AstroNN") as astronn:
         astronn_star = BashOperator(
@@ -258,28 +270,22 @@ with DAG(
             )
         )
 
-        with TaskGroup(group_id="AstroNN_Dist") as astronn_dist:
-            (
-                BashOperator(
-                    task_id="astronn_dist",
-                    bash_command='astra srun astronn_dist --mem=16000 --gres="gpu:v100" --account="notchpeak-gpu" --time="48:00:00"'
-                )
-            ) >> (
-                BashOperator(
-                    task_id="create_all_star_product",
-                    bash_command="astra create astraAllStarAstroNNdist --overwrite"
-                )
-            )
-
-
-        #skipper = PythonOperator(
-        #    task_id="skipper",
-        #    python_callable=skippy,
-        #)
-        astronn_star >> astronn_dist
-
-
     #summary_spectrum_products >>
+
+    with TaskGroup(group_id="AstroNN_Dist") as astronn_dist:
+        (
+            BashOperator(
+                task_id="astronn_dist",
+                bash_command='astra srun astronn_dist --mem=16000 --gres="gpu:v100" --account="notchpeak-gpu" --time="48:00:00"'
+            )
+        ) >> (
+            BashOperator(
+                task_id="create_all_star_product",
+                bash_command="astra create astraAllStarAstroNNdist --overwrite"
+            )
+        )
+
+    astronn_star >> astronn_dist
 
     apogeenet_star >> aspcap
 
@@ -308,7 +314,9 @@ with DAG(
         corv,
         apogeenet,
         aspcap,
-        astronn
+        astronn,
+        astronn_dist,
+        the_payne
     )
     snowwhite >> corv
     summary_spectrum_products >> star_tasks
