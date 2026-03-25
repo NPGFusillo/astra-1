@@ -2,19 +2,19 @@ import concurrent.futures
 import numpy as np
 import os
 from scipy.optimize import curve_fit
-from typing import Iterable
+from typing import Iterable, Union
 from peewee import chunked
 from tqdm import tqdm
 
 from astra import task
-from astra.models.spectrum import SpectrumMixin
+from astra.models.mwm import BossVisitSpectrum, BossCombinedSpectrum
 from astra.models.mdwarftype import MDwarfType
 from astra.utils import log, expand_path
 
 
 @task
 def mdwarftype(
-    spectra: Iterable[SpectrumMixin],
+    spectra: Iterable[Union[BossVisitSpectrum, BossCombinedSpectrum]],
     template_list: str = "$MWM_ASTRA/pipelines/MDwarfType/template.list",
     max_workers: int = 4,
     batch_size: int = 10_000
@@ -24,11 +24,11 @@ def mdwarftype(
     """
 
     template_flux, template_type = read_template_fluxes_and_types(template_list)
-    
+
     # rectify the spectra
     common_wavelength = 10**(3.5523 + 0.0001 * np.arange(4648))
     mask = (7495 <= common_wavelength) * (common_wavelength <= 7505)
-    crop = (5000 <= common_wavelength) & (common_wavelength <= 8800) 
+    crop = (5000 <= common_wavelength) & (common_wavelength <= 8800)
     rectified_template_flux = np.zeros_like(template_flux)
     for i, f in enumerate(template_flux):
         continuum = np.nanmean(f[mask])
@@ -59,7 +59,7 @@ def _mdwarf_type(spectra, template_flux, template_type):
 
     results = []
     for spectrum in spectra:
-        try:                
+        try:
             #continuum_method: str = "astra.tools.continuum.Scalar", # --> mean
             #continuum_kwargs: dict = dict(mask=[(0, 7495), (7505, 11_000)]),
             #continuum, continuum_meta = f_continuum.fit(spectrum.flux, spectrum.ivar)
@@ -76,7 +76,7 @@ def _mdwarf_type(spectra, template_flux, template_type):
             # only include nonzero ivar and where template_flux is finite in DOF
             dof = np.sum((ivar > 0) & np.isfinite(ivar) & np.isfinite(template_flux[index, crop])) - 2
             rchi2 = chi2 / dof
-            
+
             spectral_type, sub_type = template_type[index]
 
             result_flags = 1 if spectral_type == "K5.0" else 0
@@ -116,8 +116,8 @@ def get_template_type(path):
 
 def read_and_resample_template(path):
     log_wl, flux = np.loadtxt(
-        expand_path(path), 
-        skiprows=1, 
+        expand_path(path),
+        skiprows=1,
         delimiter=",",
         usecols=(1, 2)
     ).T

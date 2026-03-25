@@ -4,7 +4,7 @@ import numpy as np
 import os
 import pickle
 from collections import OrderedDict
-from typing import Iterable, Optional
+from typing import Iterable, Optional, Union
 
 from astra import task
 from astra.utils import log, executable, expand_path
