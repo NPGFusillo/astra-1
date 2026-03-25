@@ -9,6 +9,8 @@ from enum import Enum
 app = typer.Typer()
 config_app = typer.Typer(help="Manage Astra configuration.")
 app.add_typer(config_app, name="config")
+validate_app = typer.Typer(help="Validate Astra products.")
+app.add_typer(validate_app, name="validate")
 
 in_airflow_context = os.environ.get("AIRFLOW_CTX_TASK_ID", None) is not None
 
@@ -120,6 +122,84 @@ def config_path():
         typer.echo("(exists)")
     else:
         typer.echo("(does not exist yet)")
+
+
+@validate_app.command("summary")
+def validate_summary(
+    paths: Annotated[List[Path], typer.Argument(help="Paths to FITS summary files to validate.")],
+    log_file: Annotated[Optional[Path], typer.Option(help="Path to write the log file.")] = None,
+    json_file: Annotated[Optional[Path], typer.Option(help="Path to write JSON report.")] = None,
+):
+    """Check for null columns in Astra summary FITS files."""
+    import logging
+    import json
+    import numpy as np
+    from astropy.table import Table
+    from astropy.io import fits
+
+    handlers = [logging.StreamHandler()]
+    if log_file is not None:
+        handlers.append(logging.FileHandler(str(log_file)))
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s - %(message)s", handlers=handlers)
+    logger = logging.getLogger("astra.validate.summary")
+
+    all_results = {}
+    for file_path in paths:
+        file_path = Path(file_path)
+        if not file_path.exists():
+            logger.error(f"File not found: {file_path}")
+            continue
+
+        logger.info(f"Checking {file_path.name}")
+        results_tbl = {}
+        hdu = fits.open(file_path)
+        for i in range(1, len(hdu)):
+            results_tbl[f"HDU {i}"] = {}
+            tbl = Table.read(file_path, hdu=i)
+
+            if len(tbl) == 0:
+                continue
+
+            # Find columns where all values are masked/null
+            null_cols_all = [
+                col for col in tbl.colnames
+                if hasattr(tbl[col], "mask") and tbl[col].mask.all()
+            ]
+            results_tbl[f"HDU {i}"]["all"] = null_cols_all
+
+            if null_cols_all:
+                logger.warning(
+                    f"HDU = {i}, File: {file_path.name} | "
+                    f"All-null columns ({len(null_cols_all)}): {', '.join(null_cols_all)}"
+                )
+
+            # Per-release breakdown
+            try:
+                release = np.unique(tbl["release"])
+                for r in release:
+                    ev_release = tbl["release"] == r
+                    null_cols = [
+                        col for col in tbl.colnames
+                        if hasattr(tbl[col], "mask") and tbl[col][ev_release].mask.all()
+                    ]
+                    null_cols = [c for c in null_cols if c not in null_cols_all]
+                    results_tbl[f"HDU {i}"][r] = null_cols
+
+                    if null_cols:
+                        logger.warning(
+                            f"HDU = {i}, File: {file_path.name} | "
+                            f"{r} only-null columns ({len(null_cols)}): {', '.join(null_cols)}"
+                        )
+            except KeyError:
+                pass
+
+        hdu.close()
+        all_results[file_path.name] = results_tbl
+
+    if json_file is not None:
+        with open(json_file, "w") as f:
+            json.dump(all_results, f, indent=4)
+        typer.echo(f"JSON report written to {json_file}")
 
 
 class Product(str, Enum):
