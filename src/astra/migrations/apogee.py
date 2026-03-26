@@ -630,18 +630,49 @@ def migrate_apogee_coadds(apred: str, queue=None, batch_size: int = 1000, limit=
     return (n_new_coadd_spectra, n_updated_coadd_spectra)
 
 
-def migrate_apogee_visits(apred: str, max_mjd: Optional[int] = None, queue=None, batch_size: int = 1000, limit=None, incremental=True):
+def migrate_apogee_visits(
+    apred: str,
+    max_mjd: Optional[int] = None,
+    queue=None,
+    batch_size: int = 1000,
+    limit=None,
+    incremental=True,
+    where_modified=None,
+):
     """
     Migrate APOGEE visit spectrum-level information from the SDSS-V APOGEE DRP database.
 
     This function only loads spectrum-level data. Source creation and spectrum-to-source
     linking should be handled separately (e.g., via create_sources_and_link_spectra).
+
+    :param where_modified: [optional]
+        A clause to specify when spectra should be considered as 'modified'. Spectra are already
+        considered modified if:
+        - there is a new RV measurement (`rv_visit_pk`) when there was none before
+        - there is an old RV measurement (`rv_visit_pk`) and now it is set to null (old RV measurement was bad)
+        - there is an updated RV measurement (`rv_visit_pk` is greater than before)
+
+        One `where_modified` we have used in IPL-4 was:
+
+            ```
+            where_modified = (ApogeeVisitSpectrum.spectrum_flags != EXCLUDED.spectrum_flags)
+            ```
     """
 
     from astra.models.apogee import ApogeeVisitSpectrum, ApogeeCoaddedSpectrumInApStar
     from astra.models.base import database
     from astra.migrations.sdss5db.apogee_drpdb import Star, Visit, RvVisit
     from astra.migrations.sdss5db.catalogdb import CatalogdbModel
+
+    _where_modified = (
+            (ApogeeVisitSpectrum.rv_visit_pk.is_null() & EXCLUDED.rv_visit_pk.is_null(False))   # New RV measurement; none before.
+        |   (ApogeeVisitSpectrum.rv_visit_pk.is_null(False) & EXCLUDED.rv_visit_pk.is_null())   # Old RV measurement was bad.
+        |   (EXCLUDED.rv_visit_pk > ApogeeVisitSpectrum.rv_visit_pk)                            # Updated RV measurement.
+    )
+    if where_modified is not None:
+        where_modified |= _where_modified
+
+
 
     class SDSS_ID_Flat(CatalogdbModel):
         class Meta:
@@ -850,12 +881,7 @@ def migrate_apogee_visits(apred: str, max_mjd: Optional[int] = None, queue=None,
                         ],
                         preserve=preserve,
                         # These `where` conditions are the only scenarios where we would consider the spectrum as `modified`.
-                        where=(
-                            (ApogeeVisitSpectrum.rv_visit_pk.is_null() & EXCLUDED.rv_visit_pk.is_null(False))   # New RV measurement; none before.
-                        |   (ApogeeVisitSpectrum.rv_visit_pk.is_null(False) & EXCLUDED.rv_visit_pk.is_null())   # Old RV measurement was bad.
-                        |   (EXCLUDED.rv_visit_pk > ApogeeVisitSpectrum.rv_visit_pk)                            # Updated RV measurement.
-                        |   (ApogeeVisitSpectrum.spectrum_flags != EXCLUDED.spectrum_flags)                       # Updated spectrum flags
-                        )
+                        where=_where_modified
                     )
                     .tuples()
                     .execute()
