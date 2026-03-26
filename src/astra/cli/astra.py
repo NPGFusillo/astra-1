@@ -857,7 +857,7 @@ def migrate(
                 name="apogee_spectra",
                 func=migrate_apogee_spectra_from_sdss5_apogee_drpdb,
                 args=(apred,),
-                kwargs={"limit": limit, "incremental": incremental},
+                kwargs={"limit": limit, "incremental": incremental, "max_mjd": max_mjd},
                 description=f"Ingesting APOGEE {apred} spectra",
                 writes_to={"apogee_visit_spectrum"}
             )
@@ -875,7 +875,7 @@ def migrate(
             name="boss_spectra",
             func=migrate_from_spall_file,
             args=(run2d,),
-            kwargs={"limit": limit, "incremental": incremental},
+            kwargs={"limit": limit, "incremental": incremental, "max_mjd": max_mjd},
             description=f"Ingesting BOSS {run2d} spectra",
             writes_to={"boss_visit_spectrum"}
         )
