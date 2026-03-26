@@ -23,7 +23,7 @@ def migrate_apogee_spectra_from_sdss5_apogee_drpdb(apred: str, max_mjd: Optional
     v_n_new_spectra, v_n_updated_spectra = migrate_apogee_visits(apred, max_mjd=max_mjd, queue=queue, limit=limit, incremental=incremental, **kwargs)
 
     # Migrate co-added spectra
-    c_n_new_spectra, c_n_updated_spectra = migrate_apogee_coadds(apred, max_mjd=max_mjd, queue=queue, limit=limit, incremental=incremental, **kwargs)
+    c_n_new_spectra, c_n_updated_spectra = migrate_apogee_coadds(apred, queue=queue, limit=limit, incremental=incremental, **kwargs)
 
     queue.put(Ellipsis)
     return None
