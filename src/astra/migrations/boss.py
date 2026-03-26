@@ -71,7 +71,7 @@ def match_unlinked_boss_visit_spectra():
     return n
 
 
-def migrate_from_spall_file(run2d, queue, gzip=True, limit=None, batch_size=10_000, incremental=True):
+def migrate_from_spall_file(run2d, queue, max_mjd: Optional[int] = None, gzip=True, limit=None, batch_size=10_000, incremental=True):
     """
     Migrate all new BOSS visit spectrum-level information from the spAll file, which is generated
     by the SDSS-V BOSS data reduction pipeline.
@@ -142,7 +142,10 @@ def migrate_from_spall_file(run2d, queue, gzip=True, limit=None, batch_size=10_0
             if most_recent is not None:
                 most_recent_mjd = most_recent.mjd
 
-        mask = spAll["MJD"] >= most_recent_mjd
+        if max_mjd is not None:
+            mask = (spAll["MJD"] >= most_recent_mjd) & (spAll["MJD"] <= max_mjd)
+        else:
+            mask = spAll["MJD"] >= most_recent_mjd
 
         if limit is not None:
             index = np.where(np.cumsum(mask) == limit)[0][0]
